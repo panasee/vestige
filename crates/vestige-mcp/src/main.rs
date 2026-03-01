@@ -224,7 +224,12 @@ async fn main() {
 
     // Create cognitive engine (stateful neuroscience modules)
     let cognitive = Arc::new(Mutex::new(cognitive::CognitiveEngine::new()));
-    info!("CognitiveEngine initialized (28 modules)");
+    // Hydrate cognitive modules from persisted connections
+    {
+        let mut cog = cognitive.lock().await;
+        cog.hydrate(&storage);
+    }
+    info!("CognitiveEngine initialized and hydrated");
 
     // Create shared event broadcast channel for dashboard <-> MCP tool events
     let (event_tx, _) = tokio::sync::broadcast::channel::<vestige_mcp::dashboard::events::VestigeEvent>(1024);

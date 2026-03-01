@@ -9,13 +9,15 @@ use vestige_core::{
     ActivationNetwork, SynapticTaggingSystem, HippocampalIndex, ContextMatcher,
     AccessibilityCalculator, CompetitionManager, StateUpdateService,
     ImportanceSignals, NoveltySignal, ArousalSignal, RewardSignal, AttentionSignal,
-    EmotionalMemory,
+    EmotionalMemory, LinkType,
     // Advanced modules
     ImportanceTracker, ReconsolidationManager, IntentDetector, ActivityTracker,
     MemoryDreamer, MemoryChainBuilder, MemoryCompressor, CrossProjectLearner,
     AdaptiveEmbedder, SpeculativeRetriever, ConsolidationScheduler,
     // Search modules
     Reranker, RerankerConfig,
+    // Storage
+    Storage,
 };
 use vestige_core::search::TemporalSearcher;
 use vestige_core::neuroscience::predictive_retrieval::PredictiveMemory;
@@ -70,6 +72,41 @@ impl Default for CognitiveEngine {
 }
 
 impl CognitiveEngine {
+    /// Load persisted connections from storage into in-memory cognitive modules.
+    ///
+    /// Currently hydrates `ActivationNetwork` which serves `explore_connections`
+    /// "associations" queries. Other modules (MemoryChainBuilder, HippocampalIndex)
+    /// require full MemoryNode content and are deferred to a follow-up.
+    pub fn hydrate(&mut self, storage: &Storage) {
+        match storage.get_all_connections() {
+            Ok(connections) => {
+                for conn in &connections {
+                    let link_type = match conn.link_type.as_str() {
+                        "semantic" => LinkType::Semantic,
+                        "temporal" => LinkType::Temporal,
+                        "causal" => LinkType::Causal,
+                        "spatial" => LinkType::Spatial,
+                        "shared_concepts" | "complementary" => LinkType::Semantic,
+                        _ => LinkType::Semantic,
+                    };
+                    self.activation_network.add_edge(
+                        conn.source_id.clone(),
+                        conn.target_id.clone(),
+                        link_type,
+                        conn.strength,
+                    );
+                }
+                tracing::info!(
+                    count = connections.len(),
+                    "Hydrated cognitive modules from persisted connections"
+                );
+            }
+            Err(e) => {
+                tracing::warn!("Failed to hydrate cognitive modules: {}", e);
+            }
+        }
+    }
+
     /// Initialize all cognitive modules with default configurations.
     pub fn new() -> Self {
         Self {
@@ -108,5 +145,112 @@ impl CognitiveEngine {
             reranker: Reranker::new(RerankerConfig::default()),
             temporal_searcher: TemporalSearcher::new(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use vestige_core::{ConnectionRecord, IngestInput};
+    use chrono::Utc;
+    use tempfile::TempDir;
+
+    fn create_test_storage() -> (Storage, TempDir) {
+        let dir = TempDir::new().unwrap();
+        let storage = Storage::new(Some(dir.path().join("test.db"))).unwrap();
+        (storage, dir)
+    }
+
+    fn ingest_memory(storage: &Storage, content: &str) -> String {
+        let result = storage.ingest(IngestInput {
+            content: content.to_string(),
+            node_type: "fact".to_string(),
+            source: None,
+            sentiment_score: 0.0,
+            sentiment_magnitude: 0.0,
+            tags: vec!["test".to_string()],
+            valid_from: None,
+            valid_until: None,
+        }).unwrap();
+        result.id
+    }
+
+    #[test]
+    fn test_hydrate_empty_storage() {
+        let (storage, _dir) = create_test_storage();
+        let mut engine = CognitiveEngine::new();
+        engine.hydrate(&storage);
+        // Should succeed with 0 connections
+        let assocs = engine.activation_network.get_associations("nonexistent");
+        assert!(assocs.is_empty());
+    }
+
+    #[test]
+    fn test_hydrate_loads_connections() {
+        let (storage, _dir) = create_test_storage();
+
+        // Create two memories so FK constraints pass
+        let id1 = ingest_memory(&storage, "Memory about Rust programming");
+        let id2 = ingest_memory(&storage, "Memory about Cargo build system");
+
+        // Save a connection between them
+        let now = Utc::now();
+        storage.save_connection(&ConnectionRecord {
+            source_id: id1.clone(),
+            target_id: id2.clone(),
+            strength: 0.85,
+            link_type: "semantic".to_string(),
+            created_at: now,
+            last_activated: now,
+            activation_count: 1,
+        }).unwrap();
+
+        // Hydrate engine
+        let mut engine = CognitiveEngine::new();
+        engine.hydrate(&storage);
+
+        // Verify activation network has the connection
+        let assocs = engine.activation_network.get_associations(&id1);
+        assert!(!assocs.is_empty(), "Hydrated engine should have associations for {}", id1);
+        assert!(
+            assocs.iter().any(|a| a.memory_id == id2),
+            "Should find connection to {}",
+            id2
+        );
+    }
+
+    #[test]
+    fn test_hydrate_multiple_link_types() {
+        let (storage, _dir) = create_test_storage();
+
+        let id1 = ingest_memory(&storage, "Event A happened");
+        let id2 = ingest_memory(&storage, "Event B followed");
+        let id3 = ingest_memory(&storage, "Event C was caused by A");
+
+        let now = Utc::now();
+        storage.save_connection(&ConnectionRecord {
+            source_id: id1.clone(),
+            target_id: id2.clone(),
+            strength: 0.7,
+            link_type: "temporal".to_string(),
+            created_at: now,
+            last_activated: now,
+            activation_count: 1,
+        }).unwrap();
+        storage.save_connection(&ConnectionRecord {
+            source_id: id1.clone(),
+            target_id: id3.clone(),
+            strength: 0.9,
+            link_type: "causal".to_string(),
+            created_at: now,
+            last_activated: now,
+            activation_count: 1,
+        }).unwrap();
+
+        let mut engine = CognitiveEngine::new();
+        engine.hydrate(&storage);
+
+        let assocs = engine.activation_network.get_associations(&id1);
+        assert!(assocs.len() >= 2, "Should have at least 2 associations, got {}", assocs.len());
     }
 }

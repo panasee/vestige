@@ -35,7 +35,7 @@ pub fn schema() -> serde_json::Value {
 }
 
 pub async fn execute(
-    _storage: &Arc<Storage>,
+    storage: &Arc<Storage>,
     cognitive: &Arc<Mutex<CognitiveEngine>>,
     args: Option<serde_json::Value>,
 ) -> Result<serde_json::Value, String> {
@@ -103,6 +103,26 @@ pub async fn execute(
             }
 
             all_associations.truncate(limit);
+
+            // Fallback: if in-memory modules are empty, query storage directly
+            if all_associations.is_empty() {
+                drop(cog); // release cognitive lock before storage call
+                if let Ok(connections) = storage.get_connections_for_memory(from) {
+                    for conn in connections.iter().take(limit) {
+                        let other_id = if conn.source_id == from {
+                            &conn.target_id
+                        } else {
+                            &conn.source_id
+                        };
+                        all_associations.push(serde_json::json!({
+                            "memory_id": other_id,
+                            "strength": conn.strength,
+                            "link_type": conn.link_type,
+                            "source": "persistent_graph",
+                        }));
+                    }
+                }
+            }
 
             Ok(serde_json::json!({
                 "action": "associations",
@@ -273,5 +293,62 @@ mod tests {
         });
         let result = execute(&storage, &test_cognitive(), Some(args)).await;
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_associations_storage_fallback() {
+        let (storage, _dir) = test_storage().await;
+
+        // Create two memories and a direct connection in storage
+        let id1 = storage.ingest(vestige_core::IngestInput {
+            content: "Memory about Rust".to_string(),
+            node_type: "fact".to_string(),
+            source: None,
+            sentiment_score: 0.0,
+            sentiment_magnitude: 0.0,
+            tags: vec!["test".to_string()],
+            valid_from: None,
+            valid_until: None,
+        }).unwrap().id;
+
+        let id2 = storage.ingest(vestige_core::IngestInput {
+            content: "Memory about Cargo".to_string(),
+            node_type: "fact".to_string(),
+            source: None,
+            sentiment_score: 0.0,
+            sentiment_magnitude: 0.0,
+            tags: vec!["test".to_string()],
+            valid_from: None,
+            valid_until: None,
+        }).unwrap().id;
+
+        // Save connection directly to storage (bypassing cognitive engine)
+        let now = chrono::Utc::now();
+        storage.save_connection(&vestige_core::ConnectionRecord {
+            source_id: id1.clone(),
+            target_id: id2.clone(),
+            strength: 0.9,
+            link_type: "semantic".to_string(),
+            created_at: now,
+            last_activated: now,
+            activation_count: 1,
+        }).unwrap();
+
+        // Execute with empty cognitive engine — should fall back to storage
+        let cognitive = test_cognitive();
+        let args = serde_json::json!({
+            "action": "associations",
+            "from": id1,
+        });
+        let result = execute(&storage, &cognitive, Some(args)).await;
+        assert!(result.is_ok());
+        let value = result.unwrap();
+        let associations = value["associations"].as_array().unwrap();
+        assert!(
+            !associations.is_empty(),
+            "Should find associations via storage fallback"
+        );
+        assert_eq!(associations[0]["source"], "persistent_graph");
+        assert_eq!(associations[0]["memory_id"], id2);
     }
 }
