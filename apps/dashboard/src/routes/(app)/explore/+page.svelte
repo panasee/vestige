@@ -74,10 +74,10 @@
 	<div class="grid grid-cols-3 gap-2">
 		{#each (['associations', 'chains', 'bridges'] as const) as m}
 			<button onclick={() => switchMode(m)}
-				class="flex flex-col items-center gap-1 p-3 rounded-lg text-sm transition
+				class="flex flex-col items-center gap-1 p-3 rounded-xl text-sm transition
 					{mode === m
-						? 'bg-synapse/15 text-synapse-glow border border-synapse/40'
-						: 'bg-surface/30 text-dim border border-subtle/20 hover:border-subtle/40'}">
+						? 'glass !border-synapse/30 text-synapse-glow'
+						: 'glass-subtle text-dim hover:bg-white/[0.03]'}">
 				<span class="text-xl">{MODE_INFO[m].icon}</span>
 				<span class="font-medium">{m.charAt(0).toUpperCase() + m.slice(1)}</span>
 				<span class="text-[10px] text-muted text-center">{MODE_INFO[m].desc}</span>
@@ -87,22 +87,22 @@
 
 	<!-- Search for source memory -->
 	<div class="space-y-3">
-		<label class="text-xs text-dim font-medium">Source Memory</label>
+		<span class="text-xs text-dim font-medium">Source Memory</span>
 		<div class="flex gap-2">
 			<input type="text" placeholder="Search for a memory to explore from..."
 				bind:value={searchQuery}
 				onkeydown={(e) => e.key === 'Enter' && findSource()}
-				class="flex-1 px-4 py-2.5 bg-surface border border-subtle/40 rounded-lg text-text text-sm
-					placeholder:text-muted focus:outline-none focus:border-synapse/60 transition" />
+				class="flex-1 px-4 py-2.5 bg-white/[0.03] border border-synapse/10 rounded-xl text-text text-sm
+					placeholder:text-muted focus:outline-none focus:border-synapse/40 transition backdrop-blur-sm" />
 			<button onclick={findSource}
-				class="px-4 py-2.5 bg-synapse/20 border border-synapse/40 text-synapse-glow text-sm rounded-lg hover:bg-synapse/30 transition">
+				class="px-4 py-2.5 bg-synapse/20 border border-synapse/40 text-synapse-glow text-sm rounded-xl hover:bg-synapse/30 transition">
 				Find
 			</button>
 		</div>
 	</div>
 
 	{#if sourceMemory}
-		<div class="p-3 bg-synapse/10 border border-synapse/30 rounded-lg">
+		<div class="p-3 glass rounded-xl !border-synapse/20">
 			<div class="text-[10px] text-synapse-glow mb-1 uppercase tracking-wider">Source</div>
 			<p class="text-sm text-text">{sourceMemory.content.slice(0, 200)}</p>
 			<div class="flex gap-2 mt-1.5 text-[10px] text-muted">
@@ -115,22 +115,22 @@
 	<!-- Target memory (for chains/bridges) -->
 	{#if mode === 'chains' || mode === 'bridges'}
 		<div class="space-y-3">
-			<label class="text-xs text-dim font-medium">Target Memory <span class="text-muted">(for {mode})</span></label>
+			<span class="text-xs text-dim font-medium">Target Memory <span class="text-muted">(for {mode})</span></span>
 			<div class="flex gap-2">
 				<input type="text" placeholder="Search for the target memory..."
 					bind:value={targetQuery}
 					onkeydown={(e) => e.key === 'Enter' && findTarget()}
-					class="flex-1 px-4 py-2.5 bg-surface border border-subtle/40 rounded-lg text-text text-sm
-						placeholder:text-muted focus:outline-none focus:border-dream/60 transition" />
+					class="flex-1 px-4 py-2.5 bg-white/[0.03] border border-synapse/10 rounded-xl text-text text-sm
+						placeholder:text-muted focus:outline-none focus:border-dream/40 transition backdrop-blur-sm" />
 				<button onclick={findTarget}
-					class="px-4 py-2.5 bg-dream/20 border border-dream/40 text-dream-glow text-sm rounded-lg hover:bg-dream/30 transition">
+					class="px-4 py-2.5 bg-dream/20 border border-dream/40 text-dream-glow text-sm rounded-xl hover:bg-dream/30 transition">
 					Find
 				</button>
 			</div>
 		</div>
 
 		{#if targetMemory}
-			<div class="p-3 bg-dream/10 border border-dream/30 rounded-lg">
+			<div class="p-3 glass rounded-xl !border-dream/20">
 				<div class="text-[10px] text-dream-glow mb-1 uppercase tracking-wider">Target</div>
 				<p class="text-sm text-text">{targetMemory.content.slice(0, 200)}</p>
 				<div class="flex gap-2 mt-1.5 text-[10px] text-muted">
@@ -155,14 +155,14 @@
 				</div>
 				<div class="space-y-2">
 					{#each associations as assoc, i}
-						<div class="p-3 bg-surface/40 border border-subtle/20 rounded-lg flex items-start gap-3 hover:border-subtle/40 transition">
+						<div class="p-3 glass-subtle rounded-xl flex items-start gap-3 hover:bg-white/[0.03] transition">
 							<div class="w-6 h-6 rounded-full bg-synapse/15 text-synapse-glow text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
 								{i + 1}
 							</div>
 							<div class="flex-1 min-w-0">
 								<p class="text-sm text-text line-clamp-2">{assoc.content}</p>
 								<div class="flex flex-wrap gap-3 mt-1.5 text-xs text-muted">
-									{#if assoc.nodeType}<span class="px-1.5 py-0.5 bg-deep rounded">{assoc.nodeType}</span>{/if}
+									{#if assoc.nodeType}<span class="px-1.5 py-0.5 bg-white/[0.04] rounded">{assoc.nodeType}</span>{/if}
 									{#if assoc.score}<span>Score: {Number(assoc.score).toFixed(3)}</span>{/if}
 									{#if assoc.similarity}<span>Similarity: {Number(assoc.similarity).toFixed(3)}</span>{/if}
 									{#if assoc.retention}<span>{(Number(assoc.retention) * 100).toFixed(0)}% retention</span>{/if}
@@ -182,29 +182,29 @@
 	{/if}
 
 	<!-- Importance Scorer -->
-	<div class="pt-8 border-t border-subtle/20">
+	<div class="pt-8 border-t border-synapse/10">
 		<h2 class="text-lg text-bright font-semibold mb-4">Importance Scorer</h2>
 		<p class="text-xs text-muted mb-3">4-channel neuroscience scoring: novelty, arousal, reward, attention</p>
 		<textarea
 			bind:value={importanceText}
 			placeholder="Paste any text to score its importance..."
-			class="w-full h-24 px-4 py-3 bg-surface border border-subtle/40 rounded-lg text-text text-sm
-				placeholder:text-muted resize-none focus:outline-none focus:border-synapse/60 transition"
+			class="w-full h-24 px-4 py-3 bg-white/[0.03] border border-synapse/10 rounded-xl text-text text-sm
+				placeholder:text-muted resize-none focus:outline-none focus:border-synapse/40 transition backdrop-blur-sm"
 		></textarea>
 		<button onclick={scoreImportance}
-			class="mt-2 px-4 py-2 bg-dream/20 border border-dream/40 text-dream-glow text-sm rounded-lg hover:bg-dream/30 transition">
+			class="mt-2 px-4 py-2 bg-dream/20 border border-dream/40 text-dream-glow text-sm rounded-xl hover:bg-dream/30 transition">
 			Score
 		</button>
 
 		{#if importanceResult}
 			{@const channels = importanceResult.channels as Record<string, number> | undefined}
 			{@const composite = Number(importanceResult.composite || importanceResult.compositeScore || 0)}
-			<div class="mt-4 p-4 bg-surface/30 border border-subtle/20 rounded-lg">
+			<div class="mt-4 p-4 glass rounded-xl">
 				<div class="flex items-center gap-3 mb-4">
 					<span class="text-3xl text-bright font-bold">{composite.toFixed(2)}</span>
-					<span class="px-2 py-1 rounded text-xs {composite > 0.6
+					<span class="px-2 py-1 rounded-lg text-xs {composite > 0.6
 						? 'bg-recall/20 text-recall border border-recall/30'
-						: 'bg-surface text-dim border border-subtle/30'}">
+						: 'bg-white/[0.04] text-dim border border-subtle/20'}">
 						{composite > 0.6 ? 'SAVE' : 'SKIP'}
 					</span>
 				</div>

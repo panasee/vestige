@@ -2,9 +2,11 @@
 	import { onMount } from 'svelte';
 	import Graph3D from '$components/Graph3D.svelte';
 	import RetentionCurve from '$components/RetentionCurve.svelte';
+	import TimeSlider from '$components/TimeSlider.svelte';
 	import { api } from '$stores/api';
 	import { eventFeed } from '$stores/websocket';
-	import type { GraphResponse, Memory } from '$types';
+	import type { GraphResponse, GraphNode, GraphEdge, Memory } from '$types';
+	import { filterByDate } from '$lib/graph/temporal';
 
 	let graphData: GraphResponse | null = $state(null);
 	let selectedMemory: Memory | null = $state(null);
@@ -13,6 +15,21 @@
 	let isDreaming = $state(false);
 	let searchQuery = $state('');
 	let maxNodes = $state(150);
+	let temporalEnabled = $state(false);
+	let temporalDate = $state(new Date());
+
+	// Filtered graph data based on temporal mode
+	let displayNodes = $derived.by((): GraphNode[] => {
+		if (!graphData) return [];
+		if (!temporalEnabled) return graphData.nodes;
+		return filterByDate(graphData.nodes, graphData.edges, temporalDate).visibleNodes;
+	});
+
+	let displayEdges = $derived.by((): GraphEdge[] => {
+		if (!graphData) return [];
+		if (!temporalEnabled) return graphData.edges;
+		return filterByDate(graphData.nodes, graphData.edges, temporalDate).visibleEdges;
+	});
 
 	onMount(() => loadGraph());
 
@@ -73,8 +90,8 @@
 		</div>
 	{:else if graphData}
 		<Graph3D
-			nodes={graphData.nodes}
-			edges={graphData.edges}
+			nodes={displayNodes}
+			edges={displayEdges}
 			centerId={graphData.center_id}
 			events={$eventFeed}
 			{isDreaming}
@@ -91,11 +108,11 @@
 				placeholder="Center graph on..."
 				bind:value={searchQuery}
 				onkeydown={(e) => e.key === 'Enter' && searchGraph()}
-				class="flex-1 px-3 py-2 bg-abyss/80 backdrop-blur-sm border border-subtle/30 rounded-lg text-text text-sm
-					placeholder:text-muted focus:outline-none focus:border-synapse/50 transition"
+				class="flex-1 px-3 py-2 glass rounded-xl text-text text-sm
+					placeholder:text-muted focus:outline-none focus:!border-synapse/40 transition"
 			/>
 			<button onclick={searchGraph}
-				class="px-3 py-2 bg-synapse/20 border border-synapse/40 text-synapse-glow text-sm rounded-lg hover:bg-synapse/30 transition backdrop-blur-sm">
+				class="px-3 py-2 bg-synapse/20 border border-synapse/40 text-synapse-glow text-sm rounded-xl hover:bg-synapse/30 transition backdrop-blur-sm">
 				Focus
 			</button>
 		</div>
@@ -103,7 +120,7 @@
 		<div class="flex gap-2 ml-auto">
 			<!-- Node count -->
 			<select bind:value={maxNodes} onchange={() => loadGraph()}
-				class="px-2 py-2 bg-abyss/80 backdrop-blur-sm border border-subtle/30 rounded-lg text-dim text-xs">
+				class="px-2 py-2 glass rounded-xl text-dim text-xs">
 				<option value={50}>50 nodes</option>
 				<option value={100}>100 nodes</option>
 				<option value={150}>150 nodes</option>
@@ -114,7 +131,7 @@
 			<button
 				onclick={triggerDream}
 				disabled={isDreaming}
-				class="px-4 py-2 rounded-lg bg-dream/20 border border-dream/40 text-dream-glow text-sm
+				class="px-4 py-2 rounded-xl bg-dream/20 border border-dream/40 text-dream-glow text-sm
 					hover:bg-dream/30 transition-all backdrop-blur-sm disabled:opacity-50
 					{isDreaming ? 'glow-dream animate-pulse-glow' : ''}"
 			>
@@ -123,26 +140,35 @@
 
 			<!-- Reload -->
 			<button onclick={() => loadGraph()}
-				class="px-3 py-2 bg-abyss/80 backdrop-blur-sm border border-subtle/30 rounded-lg text-dim text-sm hover:text-text transition">
+				class="px-3 py-2 glass rounded-xl text-dim text-sm hover:text-text transition">
 				↻
 			</button>
 		</div>
 	</div>
 
 	<!-- Bottom stats -->
-	<div class="absolute bottom-4 left-4 z-10 text-xs text-dim backdrop-blur-sm bg-abyss/60 rounded-lg px-3 py-2 border border-subtle/20">
+	<div class="absolute bottom-4 left-4 z-10 text-xs text-dim glass rounded-xl px-3 py-2">
 		{#if graphData}
-			<span>{graphData.nodeCount} nodes</span>
+			<span>{displayNodes.length} nodes</span>
 			<span class="mx-2 text-subtle">·</span>
-			<span>{graphData.edgeCount} edges</span>
+			<span>{displayEdges.length} edges</span>
 			<span class="mx-2 text-subtle">·</span>
 			<span>depth {graphData.depth}</span>
 		{/if}
 	</div>
 
+	<!-- Temporal playback slider -->
+	{#if graphData}
+		<TimeSlider
+			nodes={graphData.nodes}
+			onDateChange={(date) => { temporalDate = date; }}
+			onToggle={(enabled) => { temporalEnabled = enabled; }}
+		/>
+	{/if}
+
 	<!-- Selected memory panel -->
 	{#if selectedMemory}
-		<div class="absolute right-0 top-0 h-full w-96 bg-abyss/95 backdrop-blur-xl border-l border-subtle/30 p-6 overflow-y-auto z-20
+		<div class="absolute right-0 top-0 h-full w-96 glass-panel p-6 overflow-y-auto z-20
 			transition-transform duration-300">
 			<div class="flex justify-between items-start mb-4">
 				<h3 class="text-bright text-sm font-semibold">Memory Detail</h3>
@@ -151,9 +177,9 @@
 
 			<div class="space-y-4">
 				<div class="flex gap-2 flex-wrap">
-					<span class="px-2 py-0.5 rounded text-xs bg-synapse/20 text-synapse-glow">{selectedMemory.nodeType}</span>
+					<span class="px-2 py-0.5 rounded-lg text-xs bg-synapse/20 text-synapse-glow">{selectedMemory.nodeType}</span>
 					{#each selectedMemory.tags as tag}
-						<span class="px-2 py-0.5 rounded text-xs bg-surface text-dim">{tag}</span>
+						<span class="px-2 py-0.5 rounded-lg text-xs bg-white/[0.04] text-dim">{tag}</span>
 					{/each}
 				</div>
 
@@ -171,7 +197,7 @@
 								<span>{bar.label}</span>
 								<span>{(bar.value * 100).toFixed(1)}%</span>
 							</div>
-							<div class="h-1.5 bg-surface rounded-full overflow-hidden">
+							<div class="h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
 								<div
 									class="h-full rounded-full transition-all duration-500"
 									style="width: {bar.value * 100}%; background: {
@@ -205,13 +231,13 @@
 				<div class="flex gap-2 pt-2">
 					<button
 						onclick={() => { if (selectedMemory) { api.memories.promote(selectedMemory.id); } }}
-						class="flex-1 px-3 py-2 rounded bg-recall/20 text-recall text-xs hover:bg-recall/30 transition"
+						class="flex-1 px-3 py-2 rounded-xl bg-recall/20 text-recall text-xs hover:bg-recall/30 transition"
 					>
 						↑ Promote
 					</button>
 					<button
 						onclick={() => { if (selectedMemory) { api.memories.demote(selectedMemory.id); } }}
-						class="flex-1 px-3 py-2 rounded bg-decay/20 text-decay text-xs hover:bg-decay/30 transition"
+						class="flex-1 px-3 py-2 rounded-xl bg-decay/20 text-decay text-xs hover:bg-decay/30 transition"
 					>
 						↓ Demote
 					</button>
@@ -220,7 +246,7 @@
 				<!-- Explore from this node -->
 				<a
 					href="/explore"
-					class="block text-center px-3 py-2 rounded bg-dream/10 text-dream-glow text-xs hover:bg-dream/20 transition border border-dream/20"
+					class="block text-center px-3 py-2 rounded-xl bg-dream/10 text-dream-glow text-xs hover:bg-dream/20 transition border border-dream/20"
 				>
 					◬ Explore Connections
 				</a>

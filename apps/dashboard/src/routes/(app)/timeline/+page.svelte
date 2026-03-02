@@ -28,7 +28,7 @@
 	<div class="flex items-center justify-between">
 		<h1 class="text-xl text-bright font-semibold">Timeline</h1>
 		<select bind:value={days} onchange={loadTimeline}
-			class="px-3 py-2 bg-surface border border-subtle/40 rounded-lg text-dim text-sm">
+			class="px-3 py-2 bg-white/[0.03] border border-synapse/10 rounded-xl text-dim text-sm focus:outline-none backdrop-blur-sm">
 			<option value={7}>7 days</option>
 			<option value={14}>14 days</option>
 			<option value={30}>30 days</option>
@@ -39,7 +39,7 @@
 	{#if loading}
 		<div class="space-y-4">
 			{#each Array(7) as _}
-				<div class="h-16 bg-surface/50 rounded-lg animate-pulse"></div>
+				<div class="h-16 glass-subtle rounded-xl animate-pulse"></div>
 			{/each}
 		</div>
 	{:else if timeline.length === 0}
@@ -49,18 +49,18 @@
 	{:else}
 		<div class="relative">
 			<!-- Timeline line -->
-			<div class="absolute left-6 top-0 bottom-0 w-px bg-subtle/30"></div>
+			<div class="absolute left-6 top-0 bottom-0 w-px bg-synapse/15"></div>
 
 			<div class="space-y-4">
 				{#each timeline as day (day.date)}
 					<div class="relative pl-14">
 						<!-- Dot -->
-						<div class="absolute left-4 top-3 w-5 h-5 rounded-full border-2 border-synapse bg-abyss flex items-center justify-center">
+						<div class="absolute left-4 top-3 w-5 h-5 rounded-full border-2 border-synapse bg-void flex items-center justify-center">
 							<div class="w-2 h-2 rounded-full bg-synapse"></div>
 						</div>
 
 						<button onclick={() => expandedDay = expandedDay === day.date ? null : day.date}
-							class="w-full text-left p-4 bg-surface/40 border border-subtle/20 rounded-lg hover:border-synapse/30 transition-all">
+							class="w-full text-left p-4 glass-subtle rounded-xl hover:bg-white/[0.03] transition-all">
 							<div class="flex items-center justify-between">
 								<div>
 									<span class="text-sm text-bright font-medium">{day.date}</span>
@@ -69,7 +69,7 @@
 								<!-- Dots for memory types -->
 								<div class="flex gap-1">
 									{#each day.memories.slice(0, 10) as m}
-										<div class="w-2 h-2 rounded-full" style="background: {NODE_TYPE_COLORS[m.nodeType] || '#6b7280'}; opacity: {0.3 + m.retentionStrength * 0.7}"></div>
+										<div class="w-2 h-2 rounded-full" style="background: {NODE_TYPE_COLORS[m.nodeType] || '#8B95A5'}; opacity: {0.3 + m.retentionStrength * 0.7}"></div>
 									{/each}
 									{#if day.memories.length > 10}
 										<span class="text-xs text-muted">+{day.memories.length - 10}</span>
@@ -78,10 +78,10 @@
 							</div>
 
 							{#if expandedDay === day.date}
-								<div class="mt-3 pt-3 border-t border-subtle/20 space-y-2">
+								<div class="mt-3 pt-3 border-t border-synapse/10 space-y-2">
 									{#each day.memories as m}
 										<div class="flex items-start gap-2 text-sm">
-											<div class="w-2 h-2 mt-1.5 rounded-full flex-shrink-0" style="background: {NODE_TYPE_COLORS[m.nodeType] || '#6b7280'}"></div>
+											<div class="w-2 h-2 mt-1.5 rounded-full flex-shrink-0" style="background: {NODE_TYPE_COLORS[m.nodeType] || '#8B95A5'}"></div>
 											<div class="flex-1 min-w-0">
 												<span class="text-dim line-clamp-1">{m.content}</span>
 											</div>

@@ -66,23 +66,23 @@
 
 	<!-- System Health Overview -->
 	<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-		<div class="p-4 bg-surface/30 border border-subtle/20 rounded-lg text-center">
+		<div class="p-4 glass rounded-xl text-center">
 			<div class="text-2xl text-bright font-bold">{$memoryCount}</div>
 			<div class="text-xs text-dim mt-1">Memories</div>
 		</div>
-		<div class="p-4 bg-surface/30 border border-subtle/20 rounded-lg text-center">
+		<div class="p-4 glass rounded-xl text-center">
 			<div class="text-2xl font-bold" style="color: {$avgRetention > 0.7 ? '#10b981' : $avgRetention > 0.4 ? '#f59e0b' : '#ef4444'}">{($avgRetention * 100).toFixed(1)}%</div>
 			<div class="text-xs text-dim mt-1">Avg Retention</div>
 		</div>
-		<div class="p-4 bg-surface/30 border border-subtle/20 rounded-lg text-center">
+		<div class="p-4 glass rounded-xl text-center">
 			<div class="text-2xl text-bright font-bold flex items-center justify-center gap-2">
 				<div class="w-2.5 h-2.5 rounded-full {$isConnected ? 'bg-recall animate-pulse-glow' : 'bg-decay'}"></div>
 				<span class="text-sm">{$isConnected ? 'Online' : 'Offline'}</span>
 			</div>
 			<div class="text-xs text-dim mt-1">WebSocket</div>
 		</div>
-		<div class="p-4 bg-surface/30 border border-subtle/20 rounded-lg text-center">
-			<div class="text-2xl text-synapse-glow font-bold">v2.0</div>
+		<div class="p-4 glass rounded-xl text-center">
+			<div class="text-2xl text-synapse-glow font-bold">v2.1</div>
 			<div class="text-xs text-dim mt-1">Vestige</div>
 		</div>
 	</div>
@@ -94,14 +94,14 @@
 		</h2>
 
 		<!-- Consolidation -->
-		<div class="p-4 bg-surface/30 border border-subtle/20 rounded-lg space-y-3">
+		<div class="p-4 glass rounded-xl space-y-3">
 			<div class="flex items-center justify-between">
 				<div>
 					<div class="text-sm text-text font-medium">FSRS-6 Consolidation</div>
 					<div class="text-xs text-dim">Apply spaced-repetition decay, regenerate embeddings, run maintenance</div>
 				</div>
 				<button onclick={runConsolidation} disabled={consolidating}
-					class="px-4 py-2 bg-warning/20 border border-warning/40 text-warning text-sm rounded-lg hover:bg-warning/30 transition disabled:opacity-50 flex items-center gap-2">
+					class="px-4 py-2 bg-warning/20 border border-warning/40 text-warning text-sm rounded-xl hover:bg-warning/30 transition disabled:opacity-50 flex items-center gap-2">
 					{#if consolidating}
 						<span class="w-3 h-3 border border-warning/50 border-t-warning rounded-full animate-spin"></span>
 						Running...
@@ -111,7 +111,7 @@
 				</button>
 			</div>
 			{#if consolidationResult}
-				<div class="bg-deep/50 p-3 rounded-lg border border-subtle/10">
+				<div class="bg-white/[0.02] p-3 rounded-lg border border-synapse/10">
 					<div class="grid grid-cols-3 gap-3 text-center">
 						{#if consolidationResult.nodesProcessed !== undefined}
 							<div>
@@ -137,14 +137,14 @@
 		</div>
 
 		<!-- Dream -->
-		<div class="p-4 bg-surface/30 border border-subtle/20 rounded-lg space-y-3">
+		<div class="p-4 glass rounded-xl space-y-3">
 			<div class="flex items-center justify-between">
 				<div>
 					<div class="text-sm text-text font-medium">Memory Dream Cycle</div>
 					<div class="text-xs text-dim">Replay memories, discover hidden connections, synthesize insights</div>
 				</div>
 				<button onclick={runDream} disabled={dreaming}
-					class="px-4 py-2 bg-dream/20 border border-dream/40 text-dream-glow text-sm rounded-lg hover:bg-dream/30 transition disabled:opacity-50 flex items-center gap-2
+					class="px-4 py-2 bg-dream/20 border border-dream/40 text-dream-glow text-sm rounded-xl hover:bg-dream/30 transition disabled:opacity-50 flex items-center gap-2
 						{dreaming ? 'glow-dream animate-pulse-glow' : ''}">
 					{#if dreaming}
 						<span class="w-3 h-3 border border-dream/50 border-t-dream rounded-full animate-spin"></span>
@@ -155,11 +155,11 @@
 				</button>
 			</div>
 			{#if dreamResult}
-				<div class="bg-deep/50 p-3 rounded-lg border border-subtle/10 space-y-2">
+				<div class="bg-white/[0.02] p-3 rounded-lg border border-synapse/10 space-y-2">
 					{#if dreamResult.insights && Array.isArray(dreamResult.insights)}
 						<div class="text-xs text-bright font-medium">Insights Discovered:</div>
 						{#each dreamResult.insights as insight}
-							<div class="text-xs text-dim bg-dream/5 border border-dream/10 rounded p-2">
+							<div class="text-xs text-dim bg-dream/5 border border-dream/10 rounded-lg p-2">
 								{typeof insight === 'string' ? insight : JSON.stringify(insight)}
 							</div>
 						{/each}
@@ -181,7 +181,7 @@
 			<h2 class="text-sm text-bright font-semibold flex items-center gap-2">
 				<span class="text-recall">◫</span> Retention Distribution
 			</h2>
-			<div class="p-4 bg-surface/30 border border-subtle/20 rounded-lg">
+			<div class="p-4 glass rounded-xl">
 				{#if retentionDist.distribution && Array.isArray(retentionDist.distribution)}
 					<div class="flex items-end gap-1 h-32">
 						{#each retentionDist.distribution as bucket, i}
@@ -208,7 +208,7 @@
 		<h2 class="text-sm text-bright font-semibold flex items-center gap-2">
 			<span class="text-synapse">⌨</span> Keyboard Shortcuts
 		</h2>
-		<div class="p-4 bg-surface/30 border border-subtle/20 rounded-lg">
+		<div class="p-4 glass-subtle rounded-xl">
 			<div class="grid grid-cols-2 gap-2 text-xs">
 				{#each [
 					{ key: '⌘ K', desc: 'Command palette' },
@@ -221,7 +221,7 @@
 					{ key: 'S', desc: 'Go to Stats' },
 				] as shortcut}
 					<div class="flex items-center gap-2 py-1">
-						<kbd class="px-1.5 py-0.5 bg-deep rounded text-[10px] font-mono text-muted min-w-[2rem] text-center">{shortcut.key}</kbd>
+						<kbd class="px-1.5 py-0.5 bg-white/[0.04] rounded text-[10px] font-mono text-muted min-w-[2rem] text-center">{shortcut.key}</kbd>
 						<span class="text-dim">{shortcut.desc}</span>
 					</div>
 				{/each}
@@ -234,17 +234,17 @@
 		<h2 class="text-sm text-bright font-semibold flex items-center gap-2">
 			<span class="text-memory">◎</span> About
 		</h2>
-		<div class="p-4 bg-surface/30 border border-subtle/20 rounded-lg space-y-3">
+		<div class="p-4 glass rounded-xl space-y-3">
 			<div class="flex items-center gap-4">
 				<div class="w-12 h-12 rounded-xl bg-gradient-to-br from-dream to-synapse flex items-center justify-center text-bright text-xl font-bold shadow-lg shadow-synapse/20">
 					V
 				</div>
 				<div>
-					<div class="text-sm text-bright font-semibold">Vestige v2.0 "Cognitive Leap"</div>
+					<div class="text-sm text-bright font-semibold">Vestige v2.1 "Nuclear Dashboard"</div>
 					<div class="text-xs text-dim">Your AI's long-term memory system</div>
 				</div>
 			</div>
-			<div class="grid grid-cols-2 gap-2 text-xs text-dim pt-2 border-t border-subtle/10">
+			<div class="grid grid-cols-2 gap-2 text-xs text-dim pt-2 border-t border-synapse/10">
 				<div>29 cognitive modules</div>
 				<div>FSRS-6 spaced repetition</div>
 				<div>Nomic Embed v1.5 (256d)</div>

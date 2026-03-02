@@ -9,7 +9,7 @@
 	let { children } = $props();
 	let showCommandPalette = $state(false);
 	let cmdQuery = $state('');
-	let cmdInput: HTMLInputElement;
+	let cmdInput = $state<HTMLInputElement>(undefined as unknown as HTMLInputElement);
 
 	onMount(() => {
 		websocket.connect();
@@ -87,14 +87,19 @@
 	}
 </script>
 
+<!-- Ambient background orbs -->
+<div class="ambient-orb ambient-orb-1" aria-hidden="true"></div>
+<div class="ambient-orb ambient-orb-2" aria-hidden="true"></div>
+<div class="ambient-orb ambient-orb-3" aria-hidden="true"></div>
+
 <!-- Desktop: sidebar + content -->
 <!-- Mobile: content + bottom nav -->
-<div class="flex flex-col md:flex-row h-screen overflow-hidden bg-void">
+<div class="flex flex-col md:flex-row h-screen overflow-hidden bg-void relative z-[1]">
 	<!-- Desktop Sidebar (hidden on mobile) -->
-	<nav class="hidden md:flex w-16 lg:w-56 flex-shrink-0 bg-abyss border-r border-subtle/30 flex-col">
+	<nav class="hidden md:flex w-16 lg:w-56 flex-shrink-0 glass-sidebar flex-col">
 		<!-- Logo -->
-		<a href="/graph" class="flex items-center gap-3 px-4 py-5 border-b border-subtle/20">
-			<div class="w-8 h-8 rounded-lg bg-gradient-to-br from-dream to-synapse flex items-center justify-center text-bright text-sm font-bold">
+		<a href="/graph" class="flex items-center gap-3 px-4 py-5 border-b border-synapse/10">
+			<div class="w-8 h-8 rounded-lg bg-gradient-to-br from-dream to-synapse flex items-center justify-center text-bright text-sm font-bold shadow-lg shadow-synapse/20">
 				V
 			</div>
 			<span class="hidden lg:block text-sm font-semibold text-bright tracking-wide">VESTIGE</span>
@@ -108,8 +113,8 @@
 					href={item.href}
 					class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 text-sm
 						{active
-							? 'bg-synapse/15 text-synapse-glow border border-synapse/30 shadow-[0_0_12px_rgba(99,102,241,0.15)]'
-							: 'text-dim hover:text-text hover:bg-surface border border-transparent'}"
+							? 'bg-synapse/15 text-synapse-glow border border-synapse/30 shadow-[0_0_12px_rgba(99,102,241,0.15)] nav-active-border'
+							: 'text-dim hover:text-text hover:bg-white/[0.03] border border-transparent'}"
 				>
 					<span class="text-base w-5 text-center">{item.icon}</span>
 					<span class="hidden lg:block">{item.label}</span>
@@ -122,15 +127,15 @@
 		<div class="px-2 pb-2">
 			<button
 				onclick={() => { showCommandPalette = true; cmdQuery = ''; requestAnimationFrame(() => cmdInput?.focus()); }}
-				class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-muted hover:text-dim hover:bg-surface/50 transition border border-subtle/20"
+				class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-muted hover:text-dim hover:bg-white/[0.03] transition border border-subtle/15"
 			>
-				<span class="text-[10px] font-mono bg-surface/60 px-1.5 py-0.5 rounded">⌘K</span>
+				<span class="text-[10px] font-mono bg-white/[0.04] px-1.5 py-0.5 rounded">⌘K</span>
 				<span class="hidden lg:block">Command</span>
 			</button>
 		</div>
 
 		<!-- Status footer -->
-		<div class="px-3 py-4 border-t border-subtle/20 space-y-2">
+		<div class="px-3 py-4 border-t border-synapse/10 space-y-2">
 			<div class="flex items-center gap-2 text-xs">
 				<div class="w-2 h-2 rounded-full {$isConnected ? 'bg-recall animate-pulse-glow' : 'bg-decay'}"></div>
 				<span class="hidden lg:block text-dim">{$isConnected ? 'Connected' : 'Offline'}</span>
@@ -150,7 +155,7 @@
 	</main>
 
 	<!-- Mobile Bottom Nav (hidden on desktop) -->
-	<nav class="md:hidden fixed bottom-0 inset-x-0 bg-abyss/95 backdrop-blur-xl border-t border-subtle/30 z-40 safe-bottom">
+	<nav class="md:hidden fixed bottom-0 inset-x-0 glass border-t border-synapse/10 z-40 safe-bottom">
 		<div class="flex items-center justify-around px-2 py-1">
 			{#each mobileNav as item}
 				{@const active = isActive(item.href, $page.url.pathname)}
@@ -183,8 +188,8 @@
 		onkeydown={(e) => { if (e.key === 'Escape') showCommandPalette = false; }}
 		onclick={(e) => { if (e.target === e.currentTarget) showCommandPalette = false; }}
 	>
-		<div class="w-full max-w-lg bg-abyss border border-subtle/40 rounded-xl shadow-2xl shadow-synapse/10 overflow-hidden">
-			<div class="flex items-center gap-3 px-4 py-3 border-b border-subtle/20">
+		<div class="w-full max-w-lg glass-panel rounded-xl shadow-2xl shadow-synapse/10 overflow-hidden">
+			<div class="flex items-center gap-3 px-4 py-3 border-b border-synapse/10">
 				<span class="text-synapse text-sm">◎</span>
 				<input
 					bind:this={cmdInput}
@@ -198,13 +203,13 @@
 						}
 					}}
 				/>
-				<span class="text-[10px] text-muted font-mono bg-surface/40 px-1.5 py-0.5 rounded">esc</span>
+				<span class="text-[10px] text-muted font-mono bg-white/[0.04] px-1.5 py-0.5 rounded">esc</span>
 			</div>
 			<div class="max-h-72 overflow-y-auto py-1">
 				{#each filteredNav as item}
 					<button
 						onclick={() => cmdNavigate(item.href)}
-						class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-dim hover:text-text hover:bg-surface/40 transition"
+						class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-dim hover:text-text hover:bg-white/[0.04] transition"
 					>
 						<span class="text-base w-5 text-center">{item.icon}</span>
 						<span>{item.label}</span>

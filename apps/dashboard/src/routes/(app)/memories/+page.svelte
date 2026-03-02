@@ -57,11 +57,11 @@
 			placeholder="Search memories..."
 			bind:value={searchQuery}
 			oninput={onSearch}
-			class="flex-1 min-w-64 px-4 py-2.5 bg-surface border border-subtle/40 rounded-lg text-text text-sm
-				placeholder:text-muted focus:outline-none focus:border-synapse/60 focus:ring-1 focus:ring-synapse/30 transition"
+			class="flex-1 min-w-64 px-4 py-2.5 bg-white/[0.03] border border-synapse/10 rounded-xl text-text text-sm
+				placeholder:text-muted focus:outline-none focus:border-synapse/40 focus:ring-1 focus:ring-synapse/20 transition backdrop-blur-sm"
 		/>
 		<select bind:value={selectedType} onchange={loadMemories}
-			class="px-3 py-2.5 bg-surface border border-subtle/40 rounded-lg text-dim text-sm focus:outline-none">
+			class="px-3 py-2.5 bg-white/[0.03] border border-synapse/10 rounded-xl text-dim text-sm focus:outline-none backdrop-blur-sm">
 			<option value="">All types</option>
 			<option value="fact">Fact</option>
 			<option value="concept">Concept</option>
@@ -84,7 +84,7 @@
 	{#if loading}
 		<div class="grid gap-3">
 			{#each Array(8) as _}
-				<div class="h-24 bg-surface/50 rounded-lg animate-pulse"></div>
+				<div class="h-24 glass-subtle rounded-xl animate-pulse"></div>
 			{/each}
 		</div>
 	{:else}
@@ -92,17 +92,17 @@
 			{#each memories as memory (memory.id)}
 				<button
 					onclick={() => selectedMemory = selectedMemory?.id === memory.id ? null : memory}
-					class="text-left p-4 bg-surface/50 border border-subtle/20 rounded-lg hover:border-synapse/30
-						hover:bg-surface transition-all duration-200 group
-						{selectedMemory?.id === memory.id ? 'border-synapse/50 glow-synapse' : ''}"
+					class="text-left p-4 glass-subtle rounded-xl hover:bg-white/[0.04]
+						transition-all duration-200 group
+						{selectedMemory?.id === memory.id ? '!border-synapse/40 glow-synapse' : ''}"
 				>
 					<div class="flex items-start justify-between gap-4">
 						<div class="flex-1 min-w-0">
 							<div class="flex items-center gap-2 mb-2">
-								<span class="w-2 h-2 rounded-full" style="background: {NODE_TYPE_COLORS[memory.nodeType] || '#6b7280'}"></span>
+								<span class="w-2 h-2 rounded-full" style="background: {NODE_TYPE_COLORS[memory.nodeType] || '#8B95A5'}"></span>
 								<span class="text-xs text-dim">{memory.nodeType}</span>
 								{#each memory.tags.slice(0, 3) as tag}
-									<span class="text-xs px-1.5 py-0.5 bg-deep rounded text-muted">{tag}</span>
+									<span class="text-xs px-1.5 py-0.5 bg-white/[0.04] rounded text-muted">{tag}</span>
 								{/each}
 							</div>
 							<p class="text-sm text-text leading-relaxed line-clamp-2">{memory.content}</p>
@@ -116,7 +116,7 @@
 					</div>
 
 					{#if selectedMemory?.id === memory.id}
-						<div class="mt-4 pt-4 border-t border-subtle/20 space-y-3">
+						<div class="mt-4 pt-4 border-t border-synapse/10 space-y-3">
 							<p class="text-sm text-text whitespace-pre-wrap">{memory.content}</p>
 							<div class="grid grid-cols-3 gap-3 text-xs text-dim">
 								<div>Storage: {(memory.storageStrength * 100).toFixed(1)}%</div>
@@ -126,13 +126,13 @@
 							<div class="flex gap-2">
 								<span role="button" tabindex="0" onclick={(e) => { e.stopPropagation(); api.memories.promote(memory.id); }}
 									onkeydown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); api.memories.promote(memory.id); } }}
-									class="px-3 py-1.5 bg-recall/20 text-recall text-xs rounded hover:bg-recall/30 cursor-pointer select-none">Promote</span>
+									class="px-3 py-1.5 bg-recall/20 text-recall text-xs rounded-lg hover:bg-recall/30 cursor-pointer select-none">Promote</span>
 								<span role="button" tabindex="0" onclick={(e) => { e.stopPropagation(); api.memories.demote(memory.id); }}
 									onkeydown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); api.memories.demote(memory.id); } }}
-									class="px-3 py-1.5 bg-decay/20 text-decay text-xs rounded hover:bg-decay/30 cursor-pointer select-none">Demote</span>
+									class="px-3 py-1.5 bg-decay/20 text-decay text-xs rounded-lg hover:bg-decay/30 cursor-pointer select-none">Demote</span>
 								<span role="button" tabindex="0" onclick={async (e) => { e.stopPropagation(); await api.memories.delete(memory.id); loadMemories(); }}
 									onkeydown={async (e) => { if (e.key === 'Enter') { e.stopPropagation(); await api.memories.delete(memory.id); loadMemories(); } }}
-									class="px-3 py-1.5 bg-decay/10 text-decay/60 text-xs rounded hover:bg-decay/20 ml-auto cursor-pointer select-none">Delete</span>
+									class="px-3 py-1.5 bg-decay/10 text-decay/60 text-xs rounded-lg hover:bg-decay/20 ml-auto cursor-pointer select-none">Delete</span>
 							</div>
 						</div>
 					{/if}

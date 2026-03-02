@@ -180,33 +180,33 @@ export interface IntentionItem {
 	snoozed_until?: string;
 }
 
-// Node type colors for visualization
+// Node type colors for visualization — bioluminescent palette
 export const NODE_TYPE_COLORS: Record<string, string> = {
-	fact: '#3b82f6',      // blue
-	concept: '#8b5cf6',   // purple
-	event: '#f59e0b',     // amber
-	person: '#10b981',    // emerald
-	place: '#06b6d4',     // cyan
-	note: '#6b7280',      // gray
-	pattern: '#ec4899',   // pink
-	decision: '#ef4444',  // red
+	fact: '#00A8FF',      // electric blue
+	concept: '#9D00FF',   // deep violet
+	event: '#FFB800',     // golden amber
+	person: '#00FFD1',    // bioluminescent cyan
+	place: '#00D4FF',     // bright cyan
+	note: '#8B95A5',      // soft steel
+	pattern: '#FF3CAC',   // hot pink
+	decision: '#FF4757',  // vivid red
 };
 
 export const EVENT_TYPE_COLORS: Record<string, string> = {
-	MemoryCreated: '#10b981',
-	MemoryUpdated: '#3b82f6',
-	MemoryDeleted: '#ef4444',
-	MemoryPromoted: '#22c55e',
-	MemoryDemoted: '#f97316',
-	SearchPerformed: '#6366f1',
-	DreamStarted: '#8b5cf6',
-	DreamProgress: '#7c3aed',
-	DreamCompleted: '#a855f7',
-	ConsolidationStarted: '#f59e0b',
-	ConsolidationCompleted: '#f97316',
-	RetentionDecayed: '#ef4444',
-	ConnectionDiscovered: '#06b6d4',
-	ActivationSpread: '#14b8a6',
-	ImportanceScored: '#ec4899',
-	Heartbeat: '#6b7280',
+	MemoryCreated: '#00FFD1',
+	MemoryUpdated: '#00A8FF',
+	MemoryDeleted: '#FF4757',
+	MemoryPromoted: '#00FF88',
+	MemoryDemoted: '#FF6B35',
+	SearchPerformed: '#818CF8',
+	DreamStarted: '#9D00FF',
+	DreamProgress: '#B44AFF',
+	DreamCompleted: '#C084FC',
+	ConsolidationStarted: '#FFB800',
+	ConsolidationCompleted: '#FF9500',
+	RetentionDecayed: '#FF4757',
+	ConnectionDiscovered: '#00D4FF',
+	ActivationSpread: '#14E8C6',
+	ImportanceScored: '#FF3CAC',
+	Heartbeat: '#8B95A5',
 };

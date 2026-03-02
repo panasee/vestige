@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { eventFeed, websocket } from '$stores/websocket';
 	import { EVENT_TYPE_COLORS, type VestigeEvent } from '$types';
+	import PipelineVisualizer from '$components/PipelineVisualizer.svelte';
 
 	function formatTime(ts: string): string {
 		return new Date(ts).toLocaleTimeString();
@@ -66,22 +67,31 @@
 		<div class="space-y-2">
 			{#each $eventFeed as event, i (i)}
 				<div
-					class="flex items-start gap-3 p-3 bg-surface/40 border border-subtle/15 rounded-lg
-						hover:border-subtle/30 transition-all duration-200"
-					style="border-left: 3px solid {EVENT_TYPE_COLORS[event.type] || '#6b7280'}"
+					class="flex items-start gap-3 p-3 glass-subtle rounded-xl
+						hover:bg-white/[0.03] transition-all duration-200"
+					style="border-left: 3px solid {EVENT_TYPE_COLORS[event.type] || '#8B95A5'}"
 				>
 					<div class="w-6 h-6 rounded flex items-center justify-center text-xs flex-shrink-0"
-						style="background: {EVENT_TYPE_COLORS[event.type] || '#6b7280'}20; color: {EVENT_TYPE_COLORS[event.type] || '#6b7280'}">
+						style="background: {EVENT_TYPE_COLORS[event.type] || '#8B95A5'}15; color: {EVENT_TYPE_COLORS[event.type] || '#8B95A5'}">
 						{eventIcon(event.type)}
 					</div>
 					<div class="flex-1 min-w-0">
 						<div class="flex items-center gap-2 mb-0.5">
-							<span class="text-xs font-medium" style="color: {EVENT_TYPE_COLORS[event.type] || '#6b7280'}">{event.type}</span>
+							<span class="text-xs font-medium" style="color: {EVENT_TYPE_COLORS[event.type] || '#8B95A5'}">{event.type}</span>
 							{#if event.data.timestamp}
 								<span class="text-xs text-muted">{formatTime(String(event.data.timestamp))}</span>
 							{/if}
 						</div>
 						<p class="text-sm text-dim">{eventSummary(event)}</p>
+						{#if event.type === 'SearchPerformed'}
+							<div class="mt-2">
+								<PipelineVisualizer
+									resultCount={Number(event.data.result_count) || 0}
+									durationMs={Number(event.data.duration_ms) || 0}
+									active={true}
+								/>
+							</div>
+						{/if}
 					</div>
 				</div>
 			{/each}

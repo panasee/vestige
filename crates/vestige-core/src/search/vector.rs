@@ -392,7 +392,7 @@ mod tests {
 
     fn create_test_vector(seed: f32) -> Vec<f32> {
         (0..DEFAULT_DIMENSIONS)
-            .map(|i| ((i as f32 + seed) / DEFAULT_DIMENSIONS as f32).sin())
+            .map(|i| ((i as f32 + 1.0) * seed).sin())
             .collect()
     }
 
