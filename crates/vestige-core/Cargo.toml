@@ -63,7 +63,7 @@ rusqlite = { version = "0.38", features = ["chrono", "serde_json"] }
 directories = "6"
 
 # Async runtime (required for codebase module)
-tokio = { version = "1", features = ["sync", "rt-multi-thread", "macros", "blocking"] }
+tokio = { version = "1", features = ["sync", "rt-multi-thread", "macros"] }
 
 # Tracing for structured logging
 tracing = "0.1"
