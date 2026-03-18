@@ -126,33 +126,34 @@ impl VectorIndexConfig {
 }
 ```
 
-### Threading Config into `Storage::new()`
+### Config Loading — OnceLock Pattern (No `Storage::new()` Signature Change)
 
-`Storage::new()` current signature: `pub fn new(db_path: Option<PathBuf>) -> Result<Self>`.
+`Storage::new()` signature is **unchanged**: `pub fn new(db_path: Option<PathBuf>) -> Result<Self>`.
 
-**Chosen approach:** Add an `embedding_config: Option<EmbeddingConfig>` parameter:
+`GeminiEmbeddingService` follows the exact same pattern as the current `EmbeddingService` / `EMBEDDING_MODEL_RESULT OnceLock`: config is loaded globally on first use via a `OnceLock<Result<GeminiConfig, String>>`. No config is threaded through `Storage::new()`, so the ~40 existing callsites (unit tests, CLI, e2e fixtures, tool tests) require **zero changes**.
 
 ```rust
-pub fn new(db_path: Option<PathBuf>, embedding_config: Option<EmbeddingConfig>) -> Result<Self>
+static GEMINI_CONFIG: OnceLock<Result<GeminiConfig, String>> = OnceLock::new();
+
+fn get_config() -> Result<&'static GeminiConfig, EmbeddingError> {
+    GEMINI_CONFIG.get_or_init(|| {
+        load_config_from_file()  // reads ~/.vestige/config.toml
+    }).as_ref().map_err(|e| EmbeddingError::ConfigError(e.clone()))
+}
 ```
 
-The MCP server loads `EmbeddingConfig` from `~/.vestige/config.toml` at startup (before calling `Storage::new()`) and passes it in. If config is absent, `None` is passed and semantic search is disabled.
+If config is absent or `api_key` is missing, `is_ready()` returns `false` and semantic search is disabled — identical behaviour to the current `EmbeddingService::is_ready()` when the ONNX model fails to load.
 
-**Affected callsites** that must be updated to pass the new parameter:
-- `crates/vestige-mcp/src/main.rs` — production server init (where `McpServer` / `Storage::new` is called)
-- `crates/vestige-mcp/src/server.rs` — `test_storage()` helper (line 1041)
-- `crates/vestige-core/src/lib.rs` — any `Storage::new()` used in integration helpers
-- `tests/e2e/src/mocks/fixtures.rs` (line 514) — pass `None`
-- `tests/e2e/src/harness/db_manager.rs` (lines 71, 85, 276, 325) — pass `None`
+`VectorIndex` dimension is set via a `#[cfg]`-gated constant:
 
-All test callsites pass `None`, disabling Gemini in tests (uses FTS5-only search).
-
-`VectorIndex` is then constructed with the configured dimension:
 ```rust
-let dim = embedding_config.as_ref().map(|c| c.output_dimensions).unwrap_or(256);
-let vector_index = VectorIndex::with_config(VectorIndexConfig::with_dimensions(dim))
-    .map_err(|e| StorageError::Init(...))?;
+#[cfg(feature = "gemini-embeddings")]
+pub const EMBEDDING_DIMENSIONS: usize = 1536;
+#[cfg(not(feature = "gemini-embeddings"))]
+pub const EMBEDDING_DIMENSIONS: usize = 256;
 ```
+
+`VectorIndex::new()` in `Storage::new()` is unchanged — it already reads `EMBEDDING_DIMENSIONS` through `VectorIndexConfig::default()`.
 
 ### `load_embeddings_into_index` — Table Change
 
