@@ -3656,6 +3656,87 @@ impl Storage {
         }
         Ok(result)
     }
+
+    /// Count memories not yet migrated to Gemini embeddings.
+    #[cfg(feature = "gemini-embeddings")]
+    pub fn count_unmigrated_gemini(&self) -> Result<i64> {
+        let reader = self.reader.lock()
+            .map_err(|_| StorageError::Init("Reader lock poisoned".into()))?;
+        reader.query_row(
+            "SELECT COUNT(*) FROM knowledge_nodes
+             WHERE embedding_model IS NULL
+                OR embedding_model != 'gemini-embedding-2-preview'",
+            [],
+            |row| row.get(0),
+        ).map_err(StorageError::from)
+    }
+
+    /// Migrate all legacy nomic embeddings to Gemini. Runs synchronously.
+    /// Call via tokio::task::spawn_blocking from async context.
+    #[cfg(feature = "gemini-embeddings")]
+    pub fn run_gemini_migration(&self) {
+        use crate::embeddings::EmbeddingService;
+
+        let svc = EmbeddingService::new();
+
+        loop {
+            // Fetch a batch of unmigrated memories (skip permanently failed ones)
+            let batch: Vec<(String, String)> = {
+                let Ok(reader) = self.reader.lock() else { break };
+                reader.prepare(
+                    "SELECT id, content FROM knowledge_nodes
+                     WHERE (embedding_model IS NULL OR embedding_model != 'gemini-embedding-2-preview')
+                       AND gemini_retry_count < 3
+                     LIMIT 32"
+                )
+                .and_then(|mut stmt| {
+                    stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+                        .map(|rows| rows.filter_map(|r| r.ok()).collect())
+                })
+                .unwrap_or_default()
+            };
+
+            if batch.is_empty() {
+                tracing::info!("Gemini migration: complete");
+                break;
+            }
+
+            let texts: Vec<&str> = batch.iter().map(|(_, c)| c.as_str()).collect();
+            match svc.embed_batch(&texts) {
+                Ok(embeddings) => {
+                    let Ok(writer) = self.writer.lock() else { break };
+                    for ((id, _), emb) in batch.iter().zip(embeddings.iter()) {
+                        if let Err(e) = writer.execute(
+                            "UPDATE knowledge_nodes
+                             SET embedding_v2 = ?1,
+                                 embedding_model = 'gemini-embedding-2-preview',
+                                 has_embedding = 1
+                             WHERE id = ?2",
+                            rusqlite::params![emb.to_bytes(), id],
+                        ) {
+                            tracing::warn!("Gemini migration DB error for {id}: {e}");
+                        } else if let Ok(mut idx) = self.vector_index.lock() {
+                            let _ = idx.add(id, &emb.vector);
+                        }
+                    }
+                    tracing::debug!("Gemini migration: migrated {} memories", batch.len());
+                }
+                Err(e) => {
+                    tracing::warn!("Gemini migration embed_batch failed: {e}");
+                    // Increment retry counts, stop — retry on next startup
+                    if let Ok(w) = self.writer.lock() {
+                        for (id, _) in &batch {
+                            let _ = w.execute(
+                                "UPDATE knowledge_nodes SET gemini_retry_count = gemini_retry_count + 1 WHERE id = ?1",
+                                rusqlite::params![id],
+                            );
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+    }
 }
 
 // ============================================================================

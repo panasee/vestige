@@ -258,6 +258,26 @@ async fn main() {
         });
     }
 
+    // Gemini background migration: re-embed legacy nomic memories
+    #[cfg(feature = "gemini-embeddings")]
+    {
+        use vestige_core::embeddings::EmbeddingService;
+
+        let svc = EmbeddingService::new();
+        if svc.is_ready() {
+            let pending: i64 = storage.count_unmigrated_gemini().unwrap_or(0);
+            if pending > 0 {
+                info!("Gemini migration: {} memories need re-embedding", pending);
+                let storage_clone = storage.clone();
+                tokio::task::spawn_blocking(move || {
+                    storage_clone.run_gemini_migration();
+                });
+            }
+        } else {
+            warn!("Gemini migration skipped: no API key configured (~/.vestige/config.toml)");
+        }
+    }
+
     // Create cognitive engine (stateful neuroscience modules)
     let cognitive = Arc::new(Mutex::new(cognitive::CognitiveEngine::new()));
     // Hydrate cognitive modules from persisted connections
