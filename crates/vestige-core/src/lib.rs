@@ -420,8 +420,10 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// FSRS algorithm version (6 = 21 parameters)
 pub const FSRS_VERSION: u8 = 6;
 
-/// Default embedding model (2026 GOD TIER: nomic-embed-text-v1.5)
-/// 8192 token context, Matryoshka support, fully open source
+/// Default embedding model
+#[cfg(feature = "gemini-embeddings")]
+pub const DEFAULT_EMBEDDING_MODEL: &str = "gemini-embedding-2-preview";
+#[cfg(not(feature = "gemini-embeddings"))]
 pub const DEFAULT_EMBEDDING_MODEL: &str = "nomic-ai/nomic-embed-text-v1.5";
 
 // ============================================================================

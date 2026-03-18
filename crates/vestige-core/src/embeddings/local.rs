@@ -18,7 +18,13 @@ use std::sync::{Mutex, OnceLock};
 /// Embedding dimensions after Matryoshka truncation
 /// Truncated from 768 → 256 for 3x storage savings with only ~2% quality loss
 /// (Matryoshka Representation Learning — the first N dims ARE the N-dim representation)
+// Only exported when gemini-embeddings is NOT active; mod.rs re-exports it.
+#[cfg(not(feature = "gemini-embeddings"))]
 pub const EMBEDDING_DIMENSIONS: usize = 256;
+// When gemini-embeddings is active, mod.rs defines EMBEDDING_DIMENSIONS = 1536.
+// matryoshka_truncate inside local.rs still needs a local constant to compile:
+#[cfg(feature = "gemini-embeddings")]
+const EMBEDDING_DIMENSIONS: usize = 256; // local path not used; keeps matryoshka_truncate compilable
 
 /// Maximum text length for embedding (truncated if longer)
 pub const MAX_TEXT_LENGTH: usize = 8192;

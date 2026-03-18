@@ -19,6 +19,9 @@ use usearch::{Index, IndexOptions, MetricKind, ScalarKind};
 
 /// Default embedding dimensions after Matryoshka truncation (768 → 256)
 /// 3x storage savings with only ~2% quality loss on MTEB benchmarks
+#[cfg(feature = "gemini-embeddings")]
+pub const DEFAULT_DIMENSIONS: usize = 1536;
+#[cfg(not(feature = "gemini-embeddings"))]
 pub const DEFAULT_DIMENSIONS: usize = 256;
 
 /// HNSW connectivity parameter (higher = better recall, more memory)
