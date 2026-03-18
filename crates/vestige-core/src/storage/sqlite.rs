@@ -1186,11 +1186,16 @@ impl Storage {
             |row| row.get(0),
         )?;
 
-        let embedding_model: Option<String> = if nodes_with_embeddings > 0 {
-            Some("nomic-embed-text-v1.5".to_string())
-        } else {
-            None
-        };
+        let embedding_model: Option<String> = reader
+            .query_row(
+                "SELECT embedding_model FROM knowledge_nodes
+                 WHERE has_embedding = 1 AND embedding_model IS NOT NULL
+                 GROUP BY embedding_model ORDER BY COUNT(*) DESC LIMIT 1",
+                [],
+                |row| row.get(0),
+            )
+            .ok()
+            .flatten();
 
         Ok(MemoryStats {
             total_nodes: total,
