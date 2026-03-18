@@ -3898,3 +3898,54 @@ mod tests {
         let _ = Storage::get_last_backup_timestamp();
     }
 }
+
+#[cfg(all(test, feature = "gemini-embeddings"))]
+mod gemini_migration_tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_count_unmigrated_returns_correct_count() {
+        let dir = TempDir::new().unwrap();
+        let storage = Storage::new(Some(dir.path().join("test.db"))).unwrap();
+
+        // Insert a memory without Gemini embedding
+        let node = storage.ingest(IngestInput {
+            content: "test content".to_string(),
+            node_type: "fact".to_string(),
+            ..Default::default()
+        }).unwrap();
+
+        let count = storage.count_unmigrated_gemini().unwrap();
+        assert!(count >= 1, "Should have at least one unmigrated memory");
+
+        // Mark as migrated
+        {
+            let writer = storage.writer.lock().unwrap();
+            writer.execute(
+                "UPDATE knowledge_nodes SET embedding_model = 'gemini-embedding-2-preview' WHERE id = ?1",
+                rusqlite::params![node.id],
+            ).unwrap();
+        }
+
+        let count_after = storage.count_unmigrated_gemini().unwrap();
+        assert_eq!(count_after, count - 1);
+    }
+
+    #[test]
+    fn test_graceful_degradation_keyword_search_works_without_embeddings() {
+        let dir = TempDir::new().unwrap();
+        let storage = Storage::new(Some(dir.path().join("test.db"))).unwrap();
+
+        let node = storage.ingest(IngestInput {
+            content: "rust programming language systems".to_string(),
+            node_type: "fact".to_string(),
+            ..Default::default()
+        }).unwrap();
+
+        // keyword_search (FTS5) must work even when Gemini is not configured.
+        let results = storage.keyword_search("rust programming", 10, 0.0).unwrap();
+        assert!(!results.is_empty(), "FTS5 search must work without Gemini API key");
+        assert_eq!(results[0].id, node.id);
+    }
+}

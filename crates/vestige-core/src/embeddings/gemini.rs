@@ -173,3 +173,54 @@ mod tests {
         let _ = svc.is_ready();
     }
 }
+
+#[cfg(all(test, feature = "gemini-embeddings"))]
+mod integration_tests {
+    use wiremock::{MockServer, Mock, ResponseTemplate};
+    use wiremock::matchers::{method, path_regex, header};
+
+    fn fake_embeddings_response(dims: usize, count: usize) -> serde_json::Value {
+        let values: Vec<f32> = (0..dims).map(|i| i as f32 / dims as f32).collect();
+        serde_json::json!({
+            "embeddings": (0..count).map(|_| serde_json::json!({ "values": values })).collect::<Vec<_>>()
+        })
+    }
+
+    #[tokio::test]
+    async fn test_embed_batch_sends_correct_request() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path_regex(".*/batchEmbedContents"))
+            .and(header("x-goog-api-key", "test-key-from-env"))
+            .respond_with(ResponseTemplate::new(200)
+                .set_body_json(fake_embeddings_response(1536, 1)))
+            .mount(&mock_server)
+            .await;
+
+        let client = reqwest::blocking::Client::new();
+        let url = format!("{}/gemini-embedding-2-preview:batchEmbedContents", mock_server.uri());
+        let body = serde_json::json!({
+            "requests": [{
+                "model": "models/gemini-embedding-2-preview",
+                "content": { "parts": [{ "text": "hello world" }] },
+                "outputDimensionality": 1536
+            }]
+        });
+
+        let resp = client.post(&url)
+            .header("x-goog-api-key", "test-key-from-env")
+            .json(&body)
+            .send()
+            .unwrap();
+
+        assert!(resp.status().is_success());
+        let json: serde_json::Value = resp.json().unwrap();
+        assert_eq!(json["embeddings"][0]["values"].as_array().unwrap().len(), 1536);
+
+        let received = mock_server.received_requests().await.unwrap();
+        assert_eq!(received.len(), 1);
+        let req_body: serde_json::Value = serde_json::from_slice(&received[0].body).unwrap();
+        assert!(req_body["requests"][0]["outputDimensionality"] == 1536);
+    }
+}
