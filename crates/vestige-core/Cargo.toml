@@ -11,7 +11,7 @@ keywords = ["memory", "spaced-repetition", "fsrs", "embeddings", "knowledge-grap
 categories = ["science", "database"]
 
 [features]
-default = ["embeddings", "vector-search", "bundled-sqlite"]
+default = ["embeddings", "vector-search", "bundled-sqlite", "gemini-embeddings"]
 
 # SQLite backend (default, unencrypted)
 bundled-sqlite = ["rusqlite/bundled"]
@@ -30,6 +30,9 @@ vector-search = ["dep:usearch"]
 # Nomic Embed Text v2 MoE (475M params, 305M active, Candle backend)
 # Requires: fastembed with nomic-v2-moe feature
 nomic-v2 = ["embeddings", "fastembed/nomic-v2-moe"]
+
+# Google Gemini embedding API (replaces local nomic ONNX model)
+gemini-embeddings = ["dep:reqwest", "dep:toml"]
 
 # Qwen3 Reranker (Candle backend, high-precision cross-encoder)
 qwen3-reranker = ["embeddings", "fastembed/qwen3"]
@@ -60,7 +63,7 @@ rusqlite = { version = "0.38", features = ["chrono", "serde_json"] }
 directories = "6"
 
 # Async runtime (required for codebase module)
-tokio = { version = "1", features = ["sync", "rt-multi-thread", "macros"] }
+tokio = { version = "1", features = ["sync", "rt-multi-thread", "macros", "blocking"] }
 
 # Tracing for structured logging
 tracing = "0.1"
@@ -79,6 +82,12 @@ notify = "8"
 # v5.11: Adds Nomic v2 MoE (nomic-v2-moe feature) + Qwen3 reranker (qwen3 feature)
 fastembed = { version = "5.11", optional = true }
 
+# HTTP client for Gemini API (blocking — Storage is fully synchronous)
+reqwest = { version = "0.12", features = ["blocking", "json", "rustls-tls"], default-features = false, optional = true }
+
+# TOML config file parsing
+toml = { version = "0.8", optional = true }
+
 # ============================================================================
 # OPTIONAL: Vector Search (USearch - HNSW, 20x faster than FAISS)
 # ============================================================================
@@ -90,6 +99,8 @@ lru = "0.16"
 [dev-dependencies]
 tempfile = "3"
 criterion = { version = "0.5", features = ["html_reports"] }
+wiremock = "0.6"
+tokio = { version = "1", features = ["rt", "macros"] }
 
 [[bench]]
 name = "search_bench"
