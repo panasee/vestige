@@ -49,6 +49,11 @@ pub const MIGRATIONS: &[Migration] = &[
         description: "v2.0.0 Cognitive Leap: emotional memory, flashbulb encoding, temporal hierarchy",
         up: MIGRATION_V9_UP,
     },
+    Migration {
+        version: 10,
+        description: "Gemini embedding: add embedding_v2 (1536D) and gemini_retry_count columns",
+        up: MIGRATION_V10_UP,
+    },
 ];
 
 /// A database migration
@@ -605,6 +610,14 @@ ALTER TABLE dream_history ADD COLUMN creative_connections_found INTEGER DEFAULT 
 UPDATE schema_version SET version = 9, applied_at = datetime('now');
 "#;
 
+/// V10: Gemini embedding integration — add embedding_v2 (1536D) and retry tracking
+const MIGRATION_V10_UP: &str = r#"
+ALTER TABLE knowledge_nodes ADD COLUMN embedding_v2 BLOB DEFAULT NULL;
+ALTER TABLE knowledge_nodes ADD COLUMN gemini_retry_count INTEGER DEFAULT 0;
+
+UPDATE schema_version SET version = 10, applied_at = datetime('now');
+"#;
+
 /// Get current schema version from database
 pub fn get_current_version(conn: &rusqlite::Connection) -> rusqlite::Result<u32> {
     conn.query_row(
@@ -644,4 +657,41 @@ pub fn apply_migrations(conn: &rusqlite::Connection) -> rusqlite::Result<u32> {
     }
 
     Ok(applied)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rusqlite::Connection;
+
+    #[test]
+    fn test_v10_migration_adds_gemini_columns() {
+        let conn = Connection::open_in_memory().unwrap();
+        apply_migrations(&conn).unwrap();
+
+        conn.execute(
+            "INSERT INTO knowledge_nodes (id, content, node_type, created_at, updated_at, last_accessed)
+             VALUES ('m1', 'test content', 'fact', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+            [],
+        ).unwrap();
+
+        conn.execute(
+            "UPDATE knowledge_nodes SET embedding_v2 = X'deadbeef', gemini_retry_count = 2 WHERE id = 'm1'",
+            [],
+        ).unwrap();
+
+        let retry: i64 = conn.query_row(
+            "SELECT gemini_retry_count FROM knowledge_nodes WHERE id = 'm1'",
+            [],
+            |row| row.get(0),
+        ).unwrap();
+        assert_eq!(retry, 2);
+
+        let has_v2: bool = conn.query_row(
+            "SELECT embedding_v2 IS NOT NULL FROM knowledge_nodes WHERE id = 'm1'",
+            [],
+            |row| row.get(0),
+        ).unwrap();
+        assert!(has_v2);
+    }
 }
