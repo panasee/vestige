@@ -3917,7 +3917,7 @@ mod gemini_migration_tests {
         }).unwrap();
 
         let count = storage.count_unmigrated_gemini().unwrap();
-        assert!(count >= 1, "Should have at least one unmigrated memory");
+        assert_eq!(count, 1, "fresh database with one ingested node should have exactly 1 unmigrated memory");
 
         // Mark as migrated
         {

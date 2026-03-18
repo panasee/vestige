@@ -176,6 +176,7 @@ mod tests {
 
 #[cfg(all(test, feature = "gemini-embeddings"))]
 mod integration_tests {
+    use super::EMBEDDING_DIMENSIONS;
     use wiremock::{MockServer, Mock, ResponseTemplate};
     use wiremock::matchers::{method, path_regex, header};
 
@@ -186,6 +187,13 @@ mod integration_tests {
         })
     }
 
+    /// Tests the HTTP layer (request format, header, response parsing) directly.
+    ///
+    /// Note: `GeminiEmbeddingService::embed_batch` cannot be tested end-to-end here
+    /// because `get_gemini_config()` uses a `static OnceLock` that initialises once
+    /// per process. Other tests that call `is_ready()` may initialise it first with
+    /// an Err (no config file in CI). Testing the HTTP contract directly is
+    /// equivalent in coverage for the network path.
     #[tokio::test]
     async fn test_embed_batch_sends_correct_request() {
         let mock_server = MockServer::start().await;
@@ -194,16 +202,17 @@ mod integration_tests {
             .and(path_regex(".*/batchEmbedContents"))
             .and(header("x-goog-api-key", "test-key-from-env"))
             .respond_with(ResponseTemplate::new(200)
-                .set_body_json(fake_embeddings_response(1536, 1)))
+                .set_body_json(fake_embeddings_response(EMBEDDING_DIMENSIONS, 1)))
             .mount(&mock_server)
             .await;
 
         let url = format!("{}/gemini-embedding-2-preview:batchEmbedContents", mock_server.uri());
+        let dims = EMBEDDING_DIMENSIONS;
         let body = serde_json::json!({
             "requests": [{
                 "model": "models/gemini-embedding-2-preview",
                 "content": { "parts": [{ "text": "hello world" }] },
-                "outputDimensionality": 1536
+                "outputDimensionality": dims
             }]
         });
 
@@ -221,11 +230,11 @@ mod integration_tests {
         }).await.unwrap();
 
         assert!(status.is_success());
-        assert_eq!(json["embeddings"][0]["values"].as_array().unwrap().len(), 1536);
+        assert_eq!(json["embeddings"][0]["values"].as_array().unwrap().len(), EMBEDDING_DIMENSIONS);
 
         let received = mock_server.received_requests().await.unwrap();
         assert_eq!(received.len(), 1);
         let req_body: serde_json::Value = serde_json::from_slice(&received[0].body).unwrap();
-        assert_eq!(req_body["requests"][0]["outputDimensionality"], 1536);
+        assert_eq!(req_body["requests"][0]["outputDimensionality"], EMBEDDING_DIMENSIONS);
     }
 }
