@@ -3943,8 +3943,8 @@ mod gemini_migration_tests {
             ..Default::default()
         }).unwrap();
 
-        // keyword_search (FTS5) must work even when Gemini is not configured.
-        let results = storage.keyword_search("rust programming", 10, 0.0).unwrap();
+        // FTS5 search must work even when Gemini is not configured.
+        let results = storage.search("rust programming", 10).unwrap();
         assert!(!results.is_empty(), "FTS5 search must work without Gemini API key");
         assert_eq!(results[0].id, node.id);
     }

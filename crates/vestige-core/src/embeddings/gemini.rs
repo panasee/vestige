@@ -198,7 +198,6 @@ mod integration_tests {
             .mount(&mock_server)
             .await;
 
-        let client = reqwest::blocking::Client::new();
         let url = format!("{}/gemini-embedding-2-preview:batchEmbedContents", mock_server.uri());
         let body = serde_json::json!({
             "requests": [{
@@ -208,19 +207,25 @@ mod integration_tests {
             }]
         });
 
-        let resp = client.post(&url)
-            .header("x-goog-api-key", "test-key-from-env")
-            .json(&body)
-            .send()
-            .unwrap();
+        // reqwest::blocking must run outside the tokio current_thread executor
+        let (status, json) = tokio::task::spawn_blocking(move || {
+            let client = reqwest::blocking::Client::new();
+            let resp = client.post(&url)
+                .header("x-goog-api-key", "test-key-from-env")
+                .json(&body)
+                .send()
+                .unwrap();
+            let status = resp.status();
+            let json: serde_json::Value = resp.json().unwrap();
+            (status, json)
+        }).await.unwrap();
 
-        assert!(resp.status().is_success());
-        let json: serde_json::Value = resp.json().unwrap();
+        assert!(status.is_success());
         assert_eq!(json["embeddings"][0]["values"].as_array().unwrap().len(), 1536);
 
         let received = mock_server.received_requests().await.unwrap();
         assert_eq!(received.len(), 1);
         let req_body: serde_json::Value = serde_json::from_slice(&received[0].body).unwrap();
-        assert!(req_body["requests"][0]["outputDimensionality"] == 1536);
+        assert_eq!(req_body["requests"][0]["outputDimensionality"], 1536);
     }
 }
