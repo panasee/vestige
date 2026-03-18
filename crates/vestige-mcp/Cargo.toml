@@ -10,9 +10,10 @@ categories = ["command-line-utilities", "database"]
 repository = "https://github.com/samvallad33/vestige"
 
 [features]
-default = ["embeddings", "vector-search"]
+default = ["embeddings", "vector-search", "gemini-embeddings"]
 embeddings = ["vestige-core/embeddings"]
 vector-search = ["vestige-core/vector-search"]
+gemini-embeddings = ["vestige-core/gemini-embeddings"]
 
 [[bin]]
 name = "vestige-mcp"
