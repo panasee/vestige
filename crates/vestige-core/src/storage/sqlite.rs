@@ -211,8 +211,17 @@ impl Storage {
         let reader = self.reader.lock()
             .map_err(|_| StorageError::Init("Reader lock poisoned".into()))?;
 
-        let mut stmt = reader
-            .prepare("SELECT node_id, embedding FROM node_embeddings")?;
+        #[cfg(feature = "gemini-embeddings")]
+        let mut stmt = reader.prepare(
+            "SELECT id, embedding_v2 FROM knowledge_nodes
+             WHERE embedding_v2 IS NOT NULL
+               AND embedding_model = 'gemini-embedding-2-preview'"
+        )?;
+
+        #[cfg(not(feature = "gemini-embeddings"))]
+        let mut stmt = reader.prepare(
+            "SELECT node_id, embedding FROM node_embeddings"
+        )?;
 
         let embeddings: Vec<(String, Vec<u8>)> = stmt
             .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
@@ -229,6 +238,9 @@ impl Storage {
 
         for (node_id, embedding_bytes) in embeddings {
             if let Some(embedding) = Embedding::from_bytes(&embedding_bytes) {
+                #[cfg(feature = "gemini-embeddings")]
+                let vector = embedding.vector;
+                #[cfg(not(feature = "gemini-embeddings"))]
                 // Handle Matryoshka migration: old 768-dim → truncate to 256-dim
                 let vector = if embedding.dimensions != EMBEDDING_DIMENSIONS {
                     matryoshka_truncate(embedding.vector)
@@ -541,8 +553,15 @@ impl Storage {
     pub fn get_all_embeddings(&self) -> Result<Vec<(String, Vec<f32>)>> {
         let reader = self.reader.lock()
             .map_err(|_| StorageError::Init("Reader lock poisoned".into()))?;
-        let mut stmt = reader
-            .prepare("SELECT node_id, embedding FROM node_embeddings")?;
+        #[cfg(feature = "gemini-embeddings")]
+        let mut stmt = reader.prepare(
+            "SELECT id, embedding_v2 FROM knowledge_nodes
+             WHERE embedding_v2 IS NOT NULL
+               AND embedding_model = 'gemini-embedding-2-preview'"
+        )?;
+
+        #[cfg(not(feature = "gemini-embeddings"))]
+        let mut stmt = reader.prepare("SELECT node_id, embedding FROM node_embeddings")?;
 
         let results: Vec<(String, Vec<f32>)> = stmt
             .query_map([], |row| {
@@ -606,22 +625,36 @@ impl Storage {
         {
             let writer = self.writer.lock()
                 .map_err(|_| StorageError::Init("Writer lock poisoned".into()))?;
+
+            #[cfg(feature = "gemini-embeddings")]
             writer.execute(
-                "INSERT OR REPLACE INTO node_embeddings (node_id, embedding, dimensions, model, created_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5)",
-                params![
-                    node_id,
-                    embedding.to_bytes(),
-                    EMBEDDING_DIMENSIONS as i32,
-                    "nomic-embed-text-v1.5",
-                    now.to_rfc3339(),
-                ],
+                "UPDATE knowledge_nodes
+                 SET has_embedding = 1,
+                     embedding_model = 'gemini-embedding-2-preview',
+                     embedding_v2 = ?1,
+                     updated_at = ?2
+                 WHERE id = ?3",
+                params![embedding.to_bytes(), now.to_rfc3339(), node_id],
             )?;
 
-            writer.execute(
-                "UPDATE knowledge_nodes SET has_embedding = 1, embedding_model = 'nomic-embed-text-v1.5' WHERE id = ?1",
-                params![node_id],
-            )?;
+            #[cfg(not(feature = "gemini-embeddings"))]
+            {
+                writer.execute(
+                    "INSERT OR REPLACE INTO node_embeddings (node_id, embedding, dimensions, model, created_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5)",
+                    params![
+                        node_id,
+                        embedding.to_bytes(),
+                        crate::embeddings::EMBEDDING_DIMENSIONS as i32,
+                        "nomic-embed-text-v1.5",
+                        now.to_rfc3339(),
+                    ],
+                )?;
+                writer.execute(
+                    "UPDATE knowledge_nodes SET has_embedding = 1, embedding_model = 'nomic-embed-text-v1.5' WHERE id = ?1",
+                    params![node_id],
+                )?;
+            }
         }
 
         let mut index = self
