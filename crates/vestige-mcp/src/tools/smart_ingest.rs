@@ -20,6 +20,9 @@ use serde_json::Value;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+#[cfg(all(feature = "embeddings", feature = "vector-search"))]
+use tokio::task;
+
 use crate::cognitive::CognitiveEngine;
 use vestige_core::{
     ContentType, ImportanceContext, ImportanceEventType, ImportanceEvent, IngestInput, Storage,
@@ -218,7 +221,10 @@ pub async fn execute(
     // Use smart ingest with prediction error gating
     #[cfg(all(feature = "embeddings", feature = "vector-search"))]
     {
-        let result = storage.smart_ingest(input).map_err(|e| e.to_string())?;
+        let storage = Arc::clone(storage);
+        let result = task::spawn_blocking(move || storage.smart_ingest(input).map_err(|e| e.to_string()))
+            .await
+            .map_err(|e| format!("Smart ingest task join error: {}", e))??;
         let node_id = result.node.id.clone();
         let node_content = result.node.content.clone();
         let node_type = result.node.node_type.clone();
@@ -398,7 +404,10 @@ async fn execute_batch(
 
         #[cfg(all(feature = "embeddings", feature = "vector-search"))]
         {
-            match storage.smart_ingest(input) {
+            let storage = Arc::clone(storage);
+            match task::spawn_blocking(move || storage.smart_ingest(input).map_err(|e| e.to_string()))
+                .await
+                .map_err(|e| format!("Batch smart ingest task join error: {}", e))? {
                 Ok(result) => {
                     let node_id = result.node.id.clone();
                     let node_content = result.node.content.clone();

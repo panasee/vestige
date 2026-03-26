@@ -19,6 +19,9 @@ use serde_json::Value;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+#[cfg(all(feature = "embeddings", feature = "vector-search"))]
+use tokio::task;
+
 use crate::cognitive::CognitiveEngine;
 use vestige_core::{
     CompetitionCandidate, EncodingContext, MemoryLifecycle, MemorySnapshot, MemoryState, Storage,
@@ -144,6 +147,20 @@ pub async fn execute(
     // ====================================================================
     let overfetch_limit = (limit * 3).min(100); // Cap at 100 to avoid excessive DB load
 
+    #[cfg(all(feature = "embeddings", feature = "vector-search"))]
+    let results = {
+        let storage = Arc::clone(storage);
+        let query = args.query.clone();
+        task::spawn_blocking(move || {
+            storage
+                .hybrid_search(&query, overfetch_limit, keyword_weight, semantic_weight)
+                .map_err(|e| e.to_string())
+        })
+        .await
+        .map_err(|e| format!("Search task join error: {}", e))??
+    };
+
+    #[cfg(not(all(feature = "embeddings", feature = "vector-search")))]
     let results = storage
         .hybrid_search(&args.query, overfetch_limit, keyword_weight, semantic_weight)
         .map_err(|e| e.to_string())?;
