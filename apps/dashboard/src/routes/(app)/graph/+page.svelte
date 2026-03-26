@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { base } from '$app/paths';
 	import { onMount } from 'svelte';
 	import Graph3D from '$components/Graph3D.svelte';
 	import RetentionCurve from '$components/RetentionCurve.svelte';
@@ -13,11 +14,14 @@
 	let selectedMemory: Memory | null = $state(null);
 	let loading = $state(true);
 	let error = $state('');
+	let actionError = $state('');
 	let isDreaming = $state(false);
 	let searchQuery = $state('');
 	let maxNodes = $state(150);
 	let temporalEnabled = $state(false);
 	let temporalDate = $state(new Date());
+	let currentQuery = $state<string | undefined>(undefined);
+	let currentCenterId = $state<string | undefined>(undefined);
 
 	// Live counts that update on mutations
 	let liveNodeCount = $state(0);
@@ -72,22 +76,26 @@
 
 	onMount(() => loadGraph());
 
-	async function loadGraph(query?: string, centerId?: string) {
+	async function loadGraph(query = currentQuery, centerId = currentCenterId) {
 		loading = true;
 		error = '';
 		try {
+			currentQuery = query || undefined;
+			currentCenterId = centerId || undefined;
 			graphData = await api.graph({
 				max_nodes: maxNodes,
 				depth: 3,
-				query: query || undefined,
-				center_id: centerId || undefined
+				query: currentQuery,
+				center_id: currentCenterId
 			});
 			if (graphData) {
 				liveNodeCount = graphData.nodeCount;
 				liveEdgeCount = graphData.edgeCount;
 			}
-		} catch {
-			error = 'No memories yet. Start using Vestige to populate your graph.';
+		} catch (err) {
+			error = err instanceof Error
+				? err.message
+				: 'No memories yet. Start using Vestige to populate your graph.';
 		} finally {
 			loading = false;
 		}
@@ -95,10 +103,13 @@
 
 	async function triggerDream() {
 		isDreaming = true;
+		actionError = '';
 		try {
 			await api.dream();
 			await loadGraph();
-		} catch { /* dream failed */ }
+		} catch (err) {
+			actionError = err instanceof Error ? err.message : 'Dream failed.';
+		}
 		finally { isDreaming = false; }
 	}
 
@@ -111,7 +122,25 @@
 	}
 
 	function searchGraph() {
-		if (searchQuery.trim()) loadGraph(searchQuery);
+		if (searchQuery.trim()) {
+			loadGraph(searchQuery.trim(), undefined);
+			return;
+		}
+		loadGraph(undefined, undefined);
+	}
+
+	async function applySelectedMemoryAction(action: 'promote' | 'demote') {
+		if (!selectedMemory) return;
+
+		try {
+			await api.memories[action](selectedMemory.id);
+			await Promise.all([
+				loadGraph(),
+				onNodeSelect(selectedMemory.id)
+			]);
+		} catch (err) {
+			actionError = err instanceof Error ? err.message : `Failed to ${action} memory.`;
+		}
 	}
 </script>
 
@@ -189,6 +218,12 @@
 			</button>
 		</div>
 	</div>
+
+	{#if actionError}
+		<div class="absolute top-20 left-4 z-10 max-w-md rounded-xl border border-decay/30 bg-void/80 px-4 py-3 text-sm text-decay backdrop-blur-sm">
+			{actionError}
+		</div>
+	{/if}
 
 	<!-- Bottom stats -->
 	<div class="absolute bottom-4 left-4 z-10 text-xs text-dim glass rounded-xl px-3 py-2">
@@ -274,13 +309,13 @@
 
 				<div class="flex gap-2 pt-2">
 					<button
-						onclick={() => { if (selectedMemory) { api.memories.promote(selectedMemory.id); } }}
+						onclick={() => applySelectedMemoryAction('promote')}
 						class="flex-1 px-3 py-2 rounded-xl bg-recall/20 text-recall text-xs hover:bg-recall/30 transition"
 					>
 						↑ Promote
 					</button>
 					<button
-						onclick={() => { if (selectedMemory) { api.memories.demote(selectedMemory.id); } }}
+						onclick={() => applySelectedMemoryAction('demote')}
 						class="flex-1 px-3 py-2 rounded-xl bg-decay/20 text-decay text-xs hover:bg-decay/30 transition"
 					>
 						↓ Demote
@@ -289,7 +324,7 @@
 
 				<!-- Explore from this node -->
 				<a
-					href="/explore"
+					href={`${base}/explore`}
 					class="block text-center px-3 py-2 rounded-xl bg-dream/10 text-dream-glow text-xs hover:bg-dream/20 transition border border-dream/20"
 				>
 					◬ Explore Connections

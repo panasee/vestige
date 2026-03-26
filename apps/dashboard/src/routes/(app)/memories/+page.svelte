@@ -12,6 +12,7 @@
 	let loading = $state(true);
 	let selectedMemory: Memory | null = $state(null);
 	let debounceTimer: ReturnType<typeof setTimeout>;
+	let actionError = $state('');
 
 	onMount(() => loadMemories());
 
@@ -42,6 +43,21 @@
 		if (r > 0.4) return '#f59e0b';
 		return '#ef4444';
 	}
+
+	async function applyMemoryAction(action: 'promote' | 'demote' | 'delete', memory: Memory) {
+		actionError = '';
+		try {
+			if (action === 'delete') {
+				await api.memories.delete(memory.id);
+				if (selectedMemory?.id === memory.id) selectedMemory = null;
+			} else {
+				await api.memories[action](memory.id);
+			}
+			await loadMemories();
+		} catch (err) {
+			actionError = err instanceof Error ? err.message : `Failed to ${action} memory.`;
+		}
+	}
 </script>
 
 <div class="p-6 max-w-6xl mx-auto space-y-6">
@@ -49,6 +65,12 @@
 		<h1 class="text-xl text-bright font-semibold">Memories</h1>
 		<span class="text-dim text-sm">{memories.length} results</span>
 	</div>
+
+	{#if actionError}
+		<div class="glass rounded-xl border border-decay/30 px-4 py-3 text-sm text-decay">
+			{actionError}
+		</div>
+	{/if}
 
 	<!-- Search & Filters -->
 	<div class="flex gap-3 flex-wrap">
@@ -124,14 +146,14 @@
 								<div>Created: {new Date(memory.createdAt).toLocaleDateString()}</div>
 							</div>
 							<div class="flex gap-2">
-								<span role="button" tabindex="0" onclick={(e) => { e.stopPropagation(); api.memories.promote(memory.id); }}
-									onkeydown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); api.memories.promote(memory.id); } }}
+								<span role="button" tabindex="0" onclick={(e) => { e.stopPropagation(); applyMemoryAction('promote', memory); }}
+									onkeydown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); applyMemoryAction('promote', memory); } }}
 									class="px-3 py-1.5 bg-recall/20 text-recall text-xs rounded-lg hover:bg-recall/30 cursor-pointer select-none">Promote</span>
-								<span role="button" tabindex="0" onclick={(e) => { e.stopPropagation(); api.memories.demote(memory.id); }}
-									onkeydown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); api.memories.demote(memory.id); } }}
+								<span role="button" tabindex="0" onclick={(e) => { e.stopPropagation(); applyMemoryAction('demote', memory); }}
+									onkeydown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); applyMemoryAction('demote', memory); } }}
 									class="px-3 py-1.5 bg-decay/20 text-decay text-xs rounded-lg hover:bg-decay/30 cursor-pointer select-none">Demote</span>
-								<span role="button" tabindex="0" onclick={async (e) => { e.stopPropagation(); await api.memories.delete(memory.id); loadMemories(); }}
-									onkeydown={async (e) => { if (e.key === 'Enter') { e.stopPropagation(); await api.memories.delete(memory.id); loadMemories(); } }}
+								<span role="button" tabindex="0" onclick={(e) => { e.stopPropagation(); applyMemoryAction('delete', memory); }}
+									onkeydown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); applyMemoryAction('delete', memory); } }}
 									class="px-3 py-1.5 bg-decay/10 text-decay/60 text-xs rounded-lg hover:bg-decay/20 ml-auto cursor-pointer select-none">Delete</span>
 							</div>
 						</div>

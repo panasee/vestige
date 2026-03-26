@@ -313,11 +313,11 @@ export function mapEventToEffects(
 		}
 
 		case 'ActivationSpread': {
-			const spreadData = event.data as { source_id?: string; target_ids?: string[] };
-			if (spreadData.source_id && spreadData.target_ids) {
+			const spreadData = event.data as { source_id?: string; activated_ids?: string[] };
+			if (spreadData.source_id && spreadData.activated_ids) {
 				const srcPos = nodePositions.get(spreadData.source_id);
 				if (srcPos) {
-					for (const targetId of spreadData.target_ids) {
+					for (const targetId of spreadData.activated_ids) {
 						const tgtPos = nodePositions.get(targetId);
 						if (tgtPos) {
 							effects.createConnectionFlash(srcPos, tgtPos, new THREE.Color(0x14e8c6));

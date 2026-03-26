@@ -378,12 +378,31 @@ pub async fn get_graph(
     };
 
     // Get subgraph
-    let (nodes, edges) = state.storage
+    let (mut nodes, edges) = state.storage
         .get_memory_subgraph(&center_id, depth, max_nodes)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     if nodes.is_empty() {
         return Err(StatusCode::NOT_FOUND);
+    }
+
+    // Fallback: if no edges found (memories haven't been connected via Dream yet),
+    // fill remaining slots with recent memories so the graph isn't nearly empty.
+    if edges.is_empty() && nodes.len() < max_nodes {
+        let remaining = max_nodes - nodes.len();
+        let existing_ids: std::collections::HashSet<String> =
+            nodes.iter().map(|n| n.id.clone()).collect();
+        let extra = state.storage
+            .get_all_nodes(remaining as i32, 0)
+            .unwrap_or_default();
+        for n in extra {
+            if !existing_ids.contains(&n.id) {
+                nodes.push(n);
+            }
+            if nodes.len() >= max_nodes {
+                break;
+            }
+        }
     }
 
     // Build nodes JSON with timestamps for recency calculation
@@ -858,7 +877,7 @@ pub async fn retention_distribution(
             endangered.push(serde_json::json!({
                 "id": node.id,
                 "content": node.content.chars().take(60).collect::<String>(),
-                "retention": node.retention_strength,
+                "retentionStrength": node.retention_strength,
                 "nodeType": node.node_type,
             }));
         }

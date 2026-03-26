@@ -1,5 +1,7 @@
 # Vestige v2.0.1 — Cognitive Memory System
 
+> **OpenClaw note:** this file is a standalone Claude-style automation prompt, not the reference prompt model for the current OpenClaw memory architecture. In OpenClaw, `orchestrator` owns final prompt composition and provider-based recall injection.
+
 Vestige is your long-term memory. 29 stateful cognitive modules implement real neuroscience: FSRS-6 spaced repetition, synaptic tagging, prediction error gating, hippocampal indexing, spreading activation, reconsolidation, and dual-strength memory theory. **Use it automatically. Use it aggressively.**
 
 ---

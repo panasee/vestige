@@ -1,6 +1,8 @@
 # Setting Up CLAUDE.md for Vestige
 
 > Make Claude use Vestige automatically
+>
+> **OpenClaw note:** this document is for standalone Claude / CLAUDE.md-style setups. In the current OpenClaw provider architecture, `orchestrator` owns final prompt composition and automatic recall injection, so this file should not be treated as the reference operating model for OpenClaw memory.
 
 ---
 
