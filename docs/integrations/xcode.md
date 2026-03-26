@@ -148,6 +148,8 @@ To give each project its own memory database:
 
 ### Use a CLAUDE.md for proactive memory
 
+> **OpenClaw note:** this section is for standalone Claude-style setups, not for OpenClaw's orchestrator/provider memory architecture.
+
 Place a `CLAUDE.md` in your project root to make the agent use Vestige automatically:
 
 ```markdown

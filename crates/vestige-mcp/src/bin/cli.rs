@@ -10,7 +10,7 @@ use chrono::{NaiveDate, Utc};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use directories::ProjectDirs;
-use vestige_core::{IngestInput, Storage};
+use vestige_core::{IngestInput, KnowledgeNode, Rating, Storage};
 
 /// Vestige - Cognitive Memory System CLI
 #[derive(Parser)]
@@ -18,7 +18,9 @@ use vestige_core::{IngestInput, Storage};
 #[command(author = "samvallad33")]
 #[command(version = env!("CARGO_PKG_VERSION"))]
 #[command(about = "CLI for the Vestige cognitive memory system")]
-#[command(long_about = "Vestige is a cognitive memory system based on 130 years of memory research.\n\nIt implements FSRS-6, spreading activation, synaptic tagging, and more.")]
+#[command(
+    long_about = "Vestige is a cognitive memory system based on 130 years of memory research.\n\nIt implements FSRS-6, spreading activation, synaptic tagging, and more."
+)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -86,6 +88,22 @@ enum Commands {
         yes: bool,
     },
 
+    /// Review memories due for FSRS spaced repetition
+    Review {
+        /// List due memories without prompting for ratings
+        #[arg(long)]
+        list: bool,
+        /// Review a specific memory by ID
+        #[arg(long)]
+        id: Option<String>,
+        /// Apply a rating directly (1=Again, 2=Hard, 3=Good, 4=Easy). Requires --id.
+        #[arg(long)]
+        rating: Option<i32>,
+        /// Maximum due memories to list or process
+        #[arg(long, default_value_t = 20)]
+        limit: usize,
+    },
+
     /// Launch the memory web dashboard
     Dashboard {
         /// Port to bind the dashboard server to
@@ -146,6 +164,12 @@ fn main() -> anyhow::Result<()> {
             dry_run,
             yes,
         } => run_gc(min_retention, max_age_days, dry_run, yes),
+        Commands::Review {
+            list,
+            id,
+            rating,
+            limit,
+        } => run_review(list, id, rating, limit),
         Commands::Dashboard { port, no_open } => run_dashboard(port, !no_open),
         Commands::Ingest {
             content,
@@ -171,21 +195,49 @@ fn run_stats(show_tagging: bool, show_states: bool) -> anyhow::Result<()> {
 
     // Basic stats
     println!("{}: {}", "Total Memories".white().bold(), stats.total_nodes);
-    println!("{}: {}", "Due for Review".white().bold(), stats.nodes_due_for_review);
-    println!("{}: {:.1}%", "Average Retention".white().bold(), stats.average_retention * 100.0);
-    println!("{}: {:.2}", "Average Storage Strength".white().bold(), stats.average_storage_strength);
-    println!("{}: {:.2}", "Average Retrieval Strength".white().bold(), stats.average_retrieval_strength);
-    println!("{}: {}", "With Embeddings".white().bold(), stats.nodes_with_embeddings);
+    println!(
+        "{}: {}",
+        "Due for Review".white().bold(),
+        stats.nodes_due_for_review
+    );
+    println!(
+        "{}: {:.1}%",
+        "Average Retention".white().bold(),
+        stats.average_retention * 100.0
+    );
+    println!(
+        "{}: {:.2}",
+        "Average Storage Strength".white().bold(),
+        stats.average_storage_strength
+    );
+    println!(
+        "{}: {:.2}",
+        "Average Retrieval Strength".white().bold(),
+        stats.average_retrieval_strength
+    );
+    println!(
+        "{}: {}",
+        "With Embeddings".white().bold(),
+        stats.nodes_with_embeddings
+    );
 
     if let Some(model) = &stats.embedding_model {
         println!("{}: {}", "Embedding Model".white().bold(), model);
     }
 
     if let Some(oldest) = stats.oldest_memory {
-        println!("{}: {}", "Oldest Memory".white().bold(), oldest.format("%Y-%m-%d %H:%M:%S"));
+        println!(
+            "{}: {}",
+            "Oldest Memory".white().bold(),
+            oldest.format("%Y-%m-%d %H:%M:%S")
+        );
     }
     if let Some(newest) = stats.newest_memory {
-        println!("{}: {}", "Newest Memory".white().bold(), newest.format("%Y-%m-%d %H:%M:%S"));
+        println!(
+            "{}: {}",
+            "Newest Memory".white().bold(),
+            newest.format("%Y-%m-%d %H:%M:%S")
+        );
     }
 
     // Embedding coverage
@@ -194,7 +246,11 @@ fn run_stats(show_tagging: bool, show_states: bool) -> anyhow::Result<()> {
     } else {
         0.0
     };
-    println!("{}: {:.1}%", "Embedding Coverage".white().bold(), embedding_coverage);
+    println!(
+        "{}: {:.1}%",
+        "Embedding Coverage".white().bold(),
+        embedding_coverage
+    );
 
     // Tagging distribution (retention levels)
     if show_tagging {
@@ -205,9 +261,18 @@ fn run_stats(show_tagging: bool, show_states: bool) -> anyhow::Result<()> {
         let total = memories.len();
 
         if total > 0 {
-            let high = memories.iter().filter(|m| m.retention_strength >= 0.7).count();
-            let medium = memories.iter().filter(|m| m.retention_strength >= 0.4 && m.retention_strength < 0.7).count();
-            let low = memories.iter().filter(|m| m.retention_strength < 0.4).count();
+            let high = memories
+                .iter()
+                .filter(|m| m.retention_strength >= 0.7)
+                .count();
+            let medium = memories
+                .iter()
+                .filter(|m| m.retention_strength >= 0.4 && m.retention_strength < 0.7)
+                .count();
+            let low = memories
+                .iter()
+                .filter(|m| m.retention_strength < 0.4)
+                .count();
 
             print_distribution_bar("High (>=70%)", high, total, "green");
             print_distribution_bar("Medium (40-70%)", medium, total, "yellow");
@@ -220,7 +285,10 @@ fn run_stats(show_tagging: bool, show_states: bool) -> anyhow::Result<()> {
     // State distribution
     if show_states {
         println!();
-        println!("{}", "=== Cognitive State Distribution ===".magenta().bold());
+        println!(
+            "{}",
+            "=== Cognitive State Distribution ===".magenta().bold()
+        );
 
         let memories = storage.get_all_nodes(500, 0)?;
         let total = memories.len();
@@ -248,7 +316,9 @@ fn run_stats(show_tagging: bool, show_states: bool) -> anyhow::Result<()> {
 }
 
 /// Compute cognitive state distribution for memories
-fn compute_state_distribution(memories: &[vestige_core::KnowledgeNode]) -> (usize, usize, usize, usize) {
+fn compute_state_distribution(
+    memories: &[vestige_core::KnowledgeNode],
+) -> (usize, usize, usize, usize) {
     let mut active = 0;
     let mut dormant = 0;
     let mut silent = 0;
@@ -297,11 +367,352 @@ fn print_distribution_bar(label: &str, count: usize, total: usize, color: &str) 
 
     println!(
         "  {:15} [{:30}] {:>4} ({:>5.1}%)",
-        label,
-        colored_bar,
-        count,
-        percentage
+        label, colored_bar, count, percentage
     );
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ReviewAction {
+    Rate(Rating),
+    Skip,
+    Quit,
+}
+
+/// Run review command
+fn run_review(
+    list: bool,
+    id: Option<String>,
+    rating: Option<i32>,
+    limit: usize,
+) -> anyhow::Result<()> {
+    if limit == 0 {
+        anyhow::bail!("--limit must be at least 1");
+    }
+
+    if rating.is_some() && id.is_none() {
+        anyhow::bail!("--rating requires --id");
+    }
+
+    if list && (id.is_some() || rating.is_some()) {
+        anyhow::bail!("--list cannot be combined with --id or --rating");
+    }
+
+    let storage = Storage::new(None)?;
+
+    if list {
+        return list_due_memories(&storage, limit);
+    }
+
+    if let Some(id) = id {
+        return review_specific_memory(&storage, &id, rating);
+    }
+
+    review_due_queue(&storage, limit)
+}
+
+fn list_due_memories(storage: &Storage, limit: usize) -> anyhow::Result<()> {
+    let nodes = storage.get_review_queue(limit as i32)?;
+
+    println!("{}", "=== Vestige Review Queue ===".cyan().bold());
+    println!();
+
+    if nodes.is_empty() {
+        println!("{}", "No memories are currently due for review.".green());
+        return Ok(());
+    }
+
+    println!("{}: {}", "Showing".white().bold(), nodes.len());
+    println!();
+
+    for (index, node) in nodes.iter().enumerate() {
+        print_review_memory_summary(node, Some((index + 1, nodes.len())));
+        println!();
+    }
+
+    println!(
+        "{}",
+        "Use 'vestige review' to step through the queue, or 'vestige review --id <uuid>' for one memory."
+            .dimmed()
+    );
+
+    Ok(())
+}
+
+fn review_due_queue(storage: &Storage, limit: usize) -> anyhow::Result<()> {
+    let nodes = storage.get_review_queue(limit as i32)?;
+
+    println!("{}", "=== Vestige Review ===".cyan().bold());
+    println!();
+
+    if nodes.is_empty() {
+        println!("{}", "No memories are currently due for review.".green());
+        return Ok(());
+    }
+
+    let total = nodes.len();
+    let mut reviewed = 0usize;
+    let mut skipped = 0usize;
+
+    'queue: for (index, node) in nodes.iter().enumerate() {
+        println!();
+        print_review_memory_summary(node, Some((index + 1, total)));
+        print_review_preview(storage, node)?;
+
+        loop {
+            print!(
+                "{}",
+                "Rate [1=Again, 2=Hard, 3=Good, 4=Easy, s=skip, q=quit]: "
+                    .white()
+                    .bold()
+            );
+            std::io::stdout().flush()?;
+
+            let mut input = String::new();
+            std::io::stdin().read_line(&mut input)?;
+
+            match parse_review_action(&input) {
+                Some(ReviewAction::Rate(selected_rating)) => {
+                    apply_review_rating(storage, node, selected_rating)?;
+                    reviewed += 1;
+                    break;
+                }
+                Some(ReviewAction::Skip) => {
+                    println!("{}", "Skipped.".yellow());
+                    skipped += 1;
+                    break;
+                }
+                Some(ReviewAction::Quit) => {
+                    println!("{}", "Stopping review session.".yellow());
+                    break 'queue;
+                }
+                None => {
+                    println!("{}", "Invalid input. Use 1-4, s, or q.".red());
+                }
+            }
+        }
+    }
+
+    println!();
+    println!("{}", "Review Summary".cyan().bold());
+    println!("{}: {}", "Reviewed".white().bold(), reviewed);
+    println!("{}: {}", "Skipped".white().bold(), skipped);
+
+    let stats = storage.get_stats()?;
+    println!(
+        "{}: {}",
+        "Still Due".white().bold(),
+        stats.nodes_due_for_review
+    );
+
+    Ok(())
+}
+
+fn review_specific_memory(storage: &Storage, id: &str, rating: Option<i32>) -> anyhow::Result<()> {
+    let node = storage
+        .get_node(id)?
+        .ok_or_else(|| anyhow::anyhow!("Memory not found: {}", id))?;
+
+    println!("{}", "=== Vestige Review ===".cyan().bold());
+    println!();
+    print_review_memory_summary(&node, None);
+    print_review_preview(storage, &node)?;
+
+    if let Some(value) = rating {
+        let selected = parse_rating_value(value)?;
+        apply_review_rating(storage, &node, selected)?;
+        return Ok(());
+    }
+
+    loop {
+        print!(
+            "{}",
+            "Rate [1=Again, 2=Hard, 3=Good, 4=Easy, q=quit]: "
+                .white()
+                .bold()
+        );
+        std::io::stdout().flush()?;
+
+        let mut input = String::new();
+        std::io::stdin().read_line(&mut input)?;
+
+        match parse_review_action(&input) {
+            Some(ReviewAction::Rate(selected_rating)) => {
+                apply_review_rating(storage, &node, selected_rating)?;
+                return Ok(());
+            }
+            Some(ReviewAction::Quit) | Some(ReviewAction::Skip) => {
+                println!("{}", "Aborted.".yellow());
+                return Ok(());
+            }
+            None => {
+                println!("{}", "Invalid input. Use 1-4 or q.".red());
+            }
+        }
+    }
+}
+
+fn print_review_memory_summary(node: &KnowledgeNode, position: Option<(usize, usize)>) {
+    if let Some((current, total)) = position {
+        println!("{}", format!("Memory {}/{}", current, total).cyan().bold());
+    }
+
+    println!("{}: {}", "ID".white().bold(), node.id);
+    println!("{}: {}", "Type".white().bold(), node.node_type);
+    println!(
+        "{}: {:.0}% | {}: {:.1} | {}: {}",
+        "Retention".white().bold(),
+        node.retention_strength * 100.0,
+        "Difficulty".white().bold(),
+        node.difficulty,
+        "Reviews".white().bold(),
+        node.reps
+    );
+    println!(
+        "{}: {}",
+        "Status".white().bold(),
+        describe_review_status(node)
+    );
+    if !node.tags.is_empty() {
+        println!("{}: {}", "Tags".white().bold(), node.tags.join(", "));
+    }
+    println!(
+        "{}: {}",
+        "Content".white().bold(),
+        truncate(&node.content, 180)
+    );
+}
+
+fn print_review_preview(storage: &Storage, node: &KnowledgeNode) -> anyhow::Result<()> {
+    let preview = storage.preview_review(&node.id)?;
+
+    println!();
+    println!("{}", "Rating Preview".yellow().bold());
+    println!(
+        "  {} {}",
+        "1 Again".red().bold(),
+        format_preview_line(&preview.again).red()
+    );
+    println!(
+        "  {} {}",
+        "2 Hard".yellow().bold(),
+        format_preview_line(&preview.hard).yellow()
+    );
+    println!(
+        "  {} {}",
+        "3 Good".green().bold(),
+        format_preview_line(&preview.good).green()
+    );
+    println!(
+        "  {} {}",
+        "4 Easy".cyan().bold(),
+        format_preview_line(&preview.easy).cyan()
+    );
+
+    Ok(())
+}
+
+fn apply_review_rating(
+    storage: &Storage,
+    before: &KnowledgeNode,
+    rating: Rating,
+) -> anyhow::Result<()> {
+    let updated = storage.mark_reviewed(&before.id, rating)?;
+    let next_review = updated
+        .next_review
+        .map(|dt| dt.format("%Y-%m-%d %H:%M").to_string())
+        .unwrap_or_else(|| "unscheduled".to_string());
+
+    println!();
+    println!(
+        "{}",
+        format!(
+            "Reviewed as {}. Retention {:.0}% -> {:.0}%. Next review: {}",
+            rating_label(rating),
+            before.retention_strength * 100.0,
+            updated.retention_strength * 100.0,
+            next_review
+        )
+        .green()
+        .bold()
+    );
+
+    Ok(())
+}
+
+fn parse_rating_value(value: i32) -> anyhow::Result<Rating> {
+    Rating::from_i32(value).ok_or_else(|| {
+        anyhow::anyhow!(
+            "Invalid rating {}. Use 1=Again, 2=Hard, 3=Good, 4=Easy.",
+            value
+        )
+    })
+}
+
+fn parse_review_action(input: &str) -> Option<ReviewAction> {
+    let normalized = input.trim().to_lowercase();
+    match normalized.as_str() {
+        "1" | "again" | "a" => Some(ReviewAction::Rate(Rating::Again)),
+        "2" | "hard" | "h" => Some(ReviewAction::Rate(Rating::Hard)),
+        "3" | "good" | "g" | "" => Some(ReviewAction::Rate(Rating::Good)),
+        "4" | "easy" | "e" => Some(ReviewAction::Rate(Rating::Easy)),
+        "s" | "skip" => Some(ReviewAction::Skip),
+        "q" | "quit" => Some(ReviewAction::Quit),
+        _ => None,
+    }
+}
+
+fn rating_label(rating: Rating) -> &'static str {
+    match rating {
+        Rating::Again => "Again",
+        Rating::Hard => "Hard",
+        Rating::Good => "Good",
+        Rating::Easy => "Easy",
+    }
+}
+
+fn format_preview_line(result: &vestige_core::ReviewResult) -> String {
+    format!(
+        "next in {}, stability {:.1}, difficulty {:.1}",
+        format_interval_days(result.interval),
+        result.state.stability,
+        result.state.difficulty
+    )
+}
+
+fn format_interval_days(days: i32) -> String {
+    match days {
+        i if i <= 0 => "less than 1 day".to_string(),
+        1 => "1 day".to_string(),
+        n => format!("{} days", n),
+    }
+}
+
+fn describe_review_status(node: &KnowledgeNode) -> String {
+    match node.next_review {
+        None => "new / never reviewed".to_string(),
+        Some(next_review) => {
+            let now = Utc::now();
+            if next_review <= now {
+                let overdue_days = now.signed_duration_since(next_review).num_days();
+                if overdue_days <= 0 {
+                    "due now".to_string()
+                } else if overdue_days == 1 {
+                    "overdue by 1 day".to_string()
+                } else {
+                    format!("overdue by {} days", overdue_days)
+                }
+            } else {
+                let days_until = next_review.signed_duration_since(now).num_days();
+                if days_until <= 0 {
+                    "scheduled later today".to_string()
+                } else if days_until == 1 {
+                    "due in 1 day".to_string()
+                } else {
+                    format!("due in {} days", days_until)
+                }
+            }
+        }
+    }
 }
 
 /// Run health check
@@ -332,8 +743,16 @@ fn run_health() -> anyhow::Result<()> {
 
     println!("{}: {}", "Status".white().bold(), colored_status);
     println!("{}: {}", "Total Memories".white(), stats.total_nodes);
-    println!("{}: {}", "Due for Review".white(), stats.nodes_due_for_review);
-    println!("{}: {:.1}%", "Average Retention".white(), stats.average_retention * 100.0);
+    println!(
+        "{}: {}",
+        "Due for Review".white(),
+        stats.nodes_due_for_review
+    );
+    println!(
+        "{}: {:.1}%",
+        "Average Retention".white(),
+        stats.average_retention * 100.0
+    );
 
     // Embedding coverage
     let embedding_coverage = if stats.total_nodes > 0 {
@@ -341,15 +760,27 @@ fn run_health() -> anyhow::Result<()> {
     } else {
         0.0
     };
-    println!("{}: {:.1}%", "Embedding Coverage".white(), embedding_coverage);
-    println!("{}: {}", "Embedding Service".white(),
-        if storage.is_embedding_ready() { "Ready".green() } else { "Not Ready".red() });
+    println!(
+        "{}: {:.1}%",
+        "Embedding Coverage".white(),
+        embedding_coverage
+    );
+    println!(
+        "{}: {}",
+        "Embedding Service".white(),
+        if storage.is_embedding_ready() {
+            "Ready".green()
+        } else {
+            "Not Ready".red()
+        }
+    );
 
     // Warnings
     let mut warnings = Vec::new();
 
     if stats.average_retention < 0.5 && stats.total_nodes > 0 {
-        warnings.push("Low average retention - consider running consolidation or reviewing memories");
+        warnings
+            .push("Low average retention - consider running consolidation or reviewing memories");
     }
 
     if stats.nodes_due_for_review > 10 {
@@ -376,7 +807,8 @@ fn run_health() -> anyhow::Result<()> {
     let mut recommendations = Vec::new();
 
     if status == "CRITICAL" {
-        recommendations.push("CRITICAL: Many memories have very low retention. Review important memories.");
+        recommendations
+            .push("CRITICAL: Many memories have very low retention. Review important memories.");
     }
 
     if stats.nodes_due_for_review > 5 {
@@ -384,7 +816,8 @@ fn run_health() -> anyhow::Result<()> {
     }
 
     if stats.nodes_with_embeddings < stats.total_nodes {
-        recommendations.push("Run 'vestige consolidate' to generate embeddings for better semantic search.");
+        recommendations
+            .push("Run 'vestige consolidate' to generate embeddings for better semantic search.");
     }
 
     if stats.total_nodes > 100 && stats.average_retention < 0.7 {
@@ -398,8 +831,16 @@ fn run_health() -> anyhow::Result<()> {
     println!();
     println!("{}", "Recommendations:".cyan().bold());
     for rec in &recommendations {
-        let icon = if rec.starts_with("CRITICAL") { "!".red().bold() } else { ">".cyan() };
-        let text = if rec.starts_with("CRITICAL") { rec.red().to_string() } else { rec.to_string() };
+        let icon = if rec.starts_with("CRITICAL") {
+            "!".red().bold()
+        } else {
+            ">".cyan()
+        };
+        let text = if rec.starts_with("CRITICAL") {
+            rec.red().to_string()
+        } else {
+            rec.to_string()
+        };
         println!("  {} {}", icon, text);
     }
 
@@ -416,11 +857,27 @@ fn run_consolidate() -> anyhow::Result<()> {
     let storage = Storage::new(None)?;
     let result = storage.run_consolidation()?;
 
-    println!("{}: {}", "Nodes Processed".white().bold(), result.nodes_processed);
-    println!("{}: {}", "Nodes Promoted".white().bold(), result.nodes_promoted);
+    println!(
+        "{}: {}",
+        "Nodes Processed".white().bold(),
+        result.nodes_processed
+    );
+    println!(
+        "{}: {}",
+        "Nodes Promoted".white().bold(),
+        result.nodes_promoted
+    );
     println!("{}: {}", "Nodes Pruned".white().bold(), result.nodes_pruned);
-    println!("{}: {}", "Decay Applied".white().bold(), result.decay_applied);
-    println!("{}: {}", "Embeddings Generated".white().bold(), result.embeddings_generated);
+    println!(
+        "{}: {}",
+        "Decay Applied".white().bold(),
+        result.decay_applied
+    );
+    println!(
+        "{}: {}",
+        "Embeddings Generated".white().bold(),
+        result.embeddings_generated
+    );
     println!("{}: {}ms", "Duration".white().bold(), result.duration_ms);
 
     println!();
@@ -523,7 +980,11 @@ fn run_restore(backup_path: PathBuf) -> anyhow::Result<()> {
     let stats = storage.get_stats()?;
     println!();
     println!("{}: {}", "Total Nodes".white(), stats.total_nodes);
-    println!("{}: {}", "With Embeddings".white(), stats.nodes_with_embeddings);
+    println!(
+        "{}: {}",
+        "With Embeddings".white(),
+        stats.nodes_with_embeddings
+    );
 
     Ok(())
 }
@@ -581,9 +1042,10 @@ fn run_backup(output: PathBuf) -> anyhow::Result<()> {
 
     // Create parent directories if needed
     if let Some(parent) = output.parent()
-        && !parent.exists() {
-            std::fs::create_dir_all(parent)?;
-        }
+        && !parent.exists()
+    {
+        std::fs::create_dir_all(parent)?;
+    }
 
     // Copy the database file
     println!("Copying database...");
@@ -630,8 +1092,9 @@ fn run_export(
     // Parse since date if provided
     let since_date = match &since {
         Some(date_str) => {
-            let naive = NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
-                .map_err(|e| anyhow::anyhow!("Invalid date '{}': {}. Use YYYY-MM-DD format.", date_str, e))?;
+            let naive = NaiveDate::parse_from_str(date_str, "%Y-%m-%d").map_err(|e| {
+                anyhow::anyhow!("Invalid date '{}': {}. Use YYYY-MM-DD format.", date_str, e)
+            })?;
             Some(
                 naive
                     .and_hms_opt(0, 0, 0)
@@ -645,7 +1108,12 @@ fn run_export(
     // Parse tags filter
     let tag_filter: Vec<String> = tags
         .as_deref()
-        .map(|t| t.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect())
+        .map(|t| {
+            t.split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect()
+        })
         .unwrap_or_default();
 
     let storage = Storage::new(None)?;
@@ -657,9 +1125,10 @@ fn run_export(
         .filter(|node| {
             // Date filter
             if let Some(ref since_dt) = since_date
-                && node.created_at < *since_dt {
-                    return false;
-                }
+                && node.created_at < *since_dt
+            {
+                return false;
+            }
             // Tag filter: node must contain ALL specified tags
             if !tag_filter.is_empty() {
                 for tag in &tag_filter {
@@ -689,9 +1158,10 @@ fn run_export(
 
     // Create parent directories if needed
     if let Some(parent) = output.parent()
-        && !parent.exists() {
-            std::fs::create_dir_all(parent)?;
-        }
+        && !parent.exists()
+    {
+        std::fs::create_dir_all(parent)?;
+    }
 
     let file = std::fs::File::create(&output)?;
     let mut writer = BufWriter::new(file);
@@ -770,7 +1240,11 @@ fn run_gc(
         })
         .collect();
 
-    println!("{}: {}", "Min retention threshold".white().bold(), min_retention);
+    println!(
+        "{}: {}",
+        "Min retention threshold".white().bold(),
+        min_retention
+    );
     if let Some(max_days) = max_age_days {
         println!("{}: {} days", "Max age".white().bold(), max_days);
     }
@@ -783,7 +1257,10 @@ fn run_gc(
 
     if candidates.is_empty() {
         println!();
-        println!("{}", "No memories match the garbage collection criteria.".green());
+        println!(
+            "{}",
+            "No memories match the garbage collection criteria.".green()
+        );
         return Ok(());
     }
 
@@ -853,7 +1330,12 @@ fn run_gc(
             Ok(true) => deleted += 1,
             Ok(false) => errors += 1, // node was already gone
             Err(e) => {
-                eprintln!("  {} Failed to delete {}: {}", "ERR".red(), &node.id[..8], e);
+                eprintln!(
+                    "  {} Failed to delete {}: {}",
+                    "ERR".red(),
+                    &node.id[..8],
+                    e
+                );
                 errors += 1;
             }
         }
@@ -960,7 +1442,10 @@ fn run_ingest(
 fn run_dashboard(port: u16, open_browser: bool) -> anyhow::Result<()> {
     println!("{}", "=== Vestige Dashboard ===".cyan().bold());
     println!();
-    println!("Starting dashboard at {}...", format!("http://127.0.0.1:{}", port).cyan());
+    println!(
+        "Starting dashboard at {}...",
+        format!("http://127.0.0.1:{}", port).cyan()
+    );
 
     let storage = Storage::new(None)?;
 
@@ -1025,8 +1510,19 @@ fn run_serve(port: u16, with_dashboard: bool, dashboard_port: u16) -> anyhow::Re
             let dc = Arc::clone(&cognitive);
             let dtx = event_tx.clone();
             tokio::spawn(async move {
-                match vestige_mcp::dashboard::start_background_with_event_tx(ds, Some(dc), dtx, dashboard_port).await {
-                    Ok(_) => println!("  {} Dashboard: http://127.0.0.1:{}", ">".cyan(), dashboard_port),
+                match vestige_mcp::dashboard::start_background_with_event_tx(
+                    ds,
+                    Some(dc),
+                    dtx,
+                    dashboard_port,
+                )
+                .await
+                {
+                    Ok(_) => println!(
+                        "  {} Dashboard: http://127.0.0.1:{}",
+                        ">".cyan(),
+                        dashboard_port
+                    ),
                     Err(e) => eprintln!("  {} Dashboard failed: {}", "!".yellow(), e),
                 }
             });
@@ -1037,7 +1533,12 @@ fn run_serve(port: u16, with_dashboard: bool, dashboard_port: u16) -> anyhow::Re
             .map_err(|e| anyhow::anyhow!("Failed to create auth token: {}", e))?;
 
         let bind = std::env::var("VESTIGE_HTTP_BIND").unwrap_or_else(|_| "127.0.0.1".to_string());
-        println!("  {} HTTP transport: http://{}:{}/mcp", ">".cyan(), bind, port);
+        println!(
+            "  {} HTTP transport: http://{}:{}/mcp",
+            ">".cyan(),
+            bind,
+            port
+        );
         println!("  {} Auth token: {}...", ">".cyan(), &token[..8]);
         println!();
         println!("{}", "Press Ctrl+C to stop.".dimmed());
@@ -1070,5 +1571,45 @@ fn truncate(s: &str, max_chars: usize) -> String {
     } else {
         let truncated: String = s.chars().take(max_chars).collect();
         format!("{}...", truncated)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_review_action_accepts_common_inputs() {
+        assert_eq!(
+            parse_review_action("1"),
+            Some(ReviewAction::Rate(Rating::Again))
+        );
+        assert_eq!(
+            parse_review_action("hard"),
+            Some(ReviewAction::Rate(Rating::Hard))
+        );
+        assert_eq!(
+            parse_review_action(""),
+            Some(ReviewAction::Rate(Rating::Good))
+        );
+        assert_eq!(
+            parse_review_action("E"),
+            Some(ReviewAction::Rate(Rating::Easy))
+        );
+        assert_eq!(parse_review_action("skip"), Some(ReviewAction::Skip));
+        assert_eq!(parse_review_action("q"), Some(ReviewAction::Quit));
+    }
+
+    #[test]
+    fn parse_review_action_rejects_invalid_input() {
+        assert_eq!(parse_review_action("5"), None);
+        assert_eq!(parse_review_action("later"), None);
+    }
+
+    #[test]
+    fn format_interval_days_is_human_readable() {
+        assert_eq!(format_interval_days(0), "less than 1 day");
+        assert_eq!(format_interval_days(1), "1 day");
+        assert_eq!(format_interval_days(3), "3 days");
     }
 }

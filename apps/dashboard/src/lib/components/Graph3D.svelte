@@ -38,12 +38,47 @@
 	let dreamMode: DreamMode;
 	let nebulaMaterial: THREE.ShaderMaterial;
 	let postStack: PostProcessingStack;
+	let initialized = false;
 
 	// Event tracking
 	let processedEventCount = 0;
 
 	// Internal tracking: initial nodes + live-added nodes
 	let allNodes: GraphNode[] = [];
+
+	function rebuildGraph() {
+		if (!ctx || !nodeManager || !edgeManager) return;
+
+		ctx.scene.remove(edgeManager.group);
+		ctx.scene.remove(nodeManager.group);
+		nodeManager.dispose();
+		edgeManager.dispose();
+
+		nodeManager = new NodeManager();
+		edgeManager = new EdgeManager();
+
+		const positions = nodeManager.createNodes(nodes);
+		edgeManager.createEdges(edges, positions);
+		forceSim = new ForceSimulation(positions);
+		allNodes = [...nodes];
+		processedEventCount = events.length;
+
+		ctx.scene.add(edgeManager.group);
+		ctx.scene.add(nodeManager.group);
+
+		const centerPos = positions.get(centerId);
+		if (centerPos) {
+			ctx.controls.target.copy(centerPos);
+		}
+	}
+
+	$effect(() => {
+		nodes;
+		edges;
+		centerId;
+		if (!initialized) return;
+		rebuildGraph();
+	});
 
 	onMount(() => {
 		ctx = createScene(container);
@@ -62,16 +97,7 @@
 		effects = new EffectManager(ctx.scene);
 		dreamMode = new DreamMode();
 
-		// Build graph
-		const positions = nodeManager.createNodes(nodes);
-		edgeManager.createEdges(edges, positions);
-		forceSim = new ForceSimulation(positions);
-
-		// Track all nodes (initial set)
-		allNodes = [...nodes];
-
-		ctx.scene.add(edgeManager.group);
-		ctx.scene.add(nodeManager.group);
+		initialized = true;
 
 		animate();
 

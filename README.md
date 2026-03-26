@@ -241,6 +241,8 @@ This isn't a key-value store with an embedding model bolted on. Vestige implemen
 
 ## Make Your AI Use Vestige Automatically
 
+> **Important OpenClaw note:** the `CLAUDE.md` automation below is for standalone Claude-style clients. In the current OpenClaw architecture, automatic recall is owned by `orchestrator` + provider plugins; do **not** use these `CLAUDE.md` instructions as the reference pattern for OpenClaw memory behavior.
+
 Add this to your `CLAUDE.md`:
 
 ```markdown
