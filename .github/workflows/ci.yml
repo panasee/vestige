@@ -38,6 +38,16 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/dashboard/package-lock.json
+
+      - name: Build dashboard
+        run: cd apps/dashboard && npm ci && npm run build
+
       - name: Check
         run: cargo check --workspace
 
@@ -83,6 +93,16 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/dashboard/package-lock.json
+
+      - name: Build dashboard
+        run: cd apps/dashboard && npm ci && npm run build
 
       - name: Build release
         run: cargo build --release --target ${{ matrix.target }} -p vestige-mcp ${{ matrix.cargo_flags }}
