@@ -68,10 +68,6 @@
 	// Mobile nav shows top 5 items
 	const mobileNav = nav.slice(0, 5);
 
-	function buildPath(path: string): string {
-		return `${base}${path}`;
-	}
-
 	function isActive(href: string, currentPath: string): boolean {
 		const path = currentPath.startsWith(base) ? currentPath.slice(base.length) || '/' : currentPath;
 		if (href === '/graph') return path === '/' || path === '/graph';
@@ -87,7 +83,7 @@
 	function cmdNavigate(href: string) {
 		showCommandPalette = false;
 		cmdQuery = '';
-		goto(buildPath(href));
+		goto(`${base}${href}`);
 	}
 </script>
 
@@ -102,7 +98,7 @@
 	<!-- Desktop Sidebar (hidden on mobile) -->
 	<nav class="hidden md:flex w-16 lg:w-56 flex-shrink-0 glass-sidebar flex-col">
 		<!-- Logo -->
-		<a href={buildPath('/graph')} class="flex items-center gap-3 px-4 py-5 border-b border-synapse/10">
+		<a href="{base}/graph" class="flex items-center gap-3 px-4 py-5 border-b border-synapse/10">
 			<div class="w-8 h-8 rounded-lg bg-gradient-to-br from-dream to-synapse flex items-center justify-center text-bright text-sm font-bold shadow-lg shadow-synapse/20">
 				V
 			</div>
@@ -114,7 +110,7 @@
 			{#each nav as item}
 				{@const active = isActive(item.href, $page.url.pathname)}
 				<a
-					href={buildPath(item.href)}
+					href="{base}{item.href}"
 					class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 text-sm
 						{active
 							? 'bg-synapse/15 text-synapse-glow border border-synapse/30 shadow-[0_0_12px_rgba(99,102,241,0.15)] nav-active-border'
@@ -164,7 +160,7 @@
 			{#each mobileNav as item}
 				{@const active = isActive(item.href, $page.url.pathname)}
 				<a
-					href={buildPath(item.href)}
+					href="{base}{item.href}"
 					class="flex flex-col items-center gap-0.5 px-3 py-2 rounded-lg transition-all min-w-[3.5rem]
 						{active ? 'text-synapse-glow' : 'text-muted'}"
 				>

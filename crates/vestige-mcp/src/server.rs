@@ -811,10 +811,14 @@ impl McpServer {
         };
 
         let uri = &request.uri;
-        let content = if uri.starts_with("memory://") {
-            resources::memory::read(&self.storage, uri).await
-        } else if uri.starts_with("codebase://") {
-            resources::codebase::read(&self.storage, uri).await
+        // Normalize URI: strip provider prefix (e.g., "vestige/") for scheme matching
+        // OpenCode and other MCP clients may send "vestige/memory://recent"
+        // but we register resources as "memory://recent"
+        let normalized_uri = uri.strip_prefix("vestige/").unwrap_or(uri);
+        let content = if normalized_uri.starts_with("memory://") {
+            resources::memory::read(&self.storage, normalized_uri).await
+        } else if normalized_uri.starts_with("codebase://") {
+            resources::codebase::read(&self.storage, normalized_uri).await
         } else {
             Err(format!("Unknown resource scheme: {}", uri))
         };

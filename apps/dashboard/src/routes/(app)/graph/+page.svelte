@@ -324,7 +324,7 @@
 
 				<!-- Explore from this node -->
 				<a
-					href={`${base}/explore`}
+					href="{base}/explore"
 					class="block text-center px-3 py-2 rounded-xl bg-dream/10 text-dream-glow text-xs hover:bg-dream/20 transition border border-dream/20"
 				>
 					◬ Explore Connections
